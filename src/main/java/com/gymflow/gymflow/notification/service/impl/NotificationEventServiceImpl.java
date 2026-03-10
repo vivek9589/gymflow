@@ -24,6 +24,7 @@ public class NotificationEventServiceImpl implements NotificationEventService {
         this.webhookSender = webhookSender;
     }
 
+
     @Override
     public void createNotification(Member member, NotificationTemplate template) {
         String message = renderTemplate(member, template);
@@ -31,9 +32,12 @@ public class NotificationEventServiceImpl implements NotificationEventService {
         NotificationEvent event = new NotificationEvent();
         event.setMember(member);
         event.setTemplate(template);
-       // event.setType(template.getName());
-      //  event.setMessage(message);
-      //  event.setChannel(template.getChannel().getName());
+
+        // Set the actual channel entity
+        if (template.getChannel() != null) {
+            event.setChannel(template.getChannel());
+        }
+
         event.setStatus("PENDING");
         event.setCreatedAt(LocalDateTime.now());
 
@@ -45,7 +49,9 @@ public class NotificationEventServiceImpl implements NotificationEventService {
         payload.put("memberName", member.getName());
         payload.put("phone", member.getPhone());
         payload.put("message", message);
-        payload.put("channel", template.getChannel().getName());
+
+        // For JSON payload, use channel name string
+        payload.put("channel", template.getChannel() != null ? template.getChannel().getName() : null);
 
         boolean success;
         try {

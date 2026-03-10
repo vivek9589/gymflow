@@ -14,7 +14,7 @@ public class MemberJoinRequest {
     private String name; // [cite: 5]
 
     @NotBlank(message = "Phone is required")
-    @Pattern(regexp = "^[0-9]{10}$", message = "Invalid phone number")
+   // @Pattern(regexp = "^[0-9]{10}$", message = "Invalid phone number")
     private String phone; // [cite: 13]
 
     private String email; // [cite: 15]

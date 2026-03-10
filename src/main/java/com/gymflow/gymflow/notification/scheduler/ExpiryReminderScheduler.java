@@ -5,13 +5,15 @@ import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
 import com.gymflow.gymflow.notification.service.NotificationEventService;
-import com.gymflow.gymflow.notification.service.NotificationService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+
+
+
 @Component
 public class ExpiryReminderScheduler {
 
