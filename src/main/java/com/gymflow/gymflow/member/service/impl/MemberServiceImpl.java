@@ -11,6 +11,7 @@ import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.member.service.MemberService;
 import com.gymflow.gymflow.notification.entity.NotificationChannel;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
+import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
 import com.gymflow.gymflow.notification.service.NotificationEventService;
 import com.gymflow.gymflow.plan.entity.Plan;
 import com.gymflow.gymflow.plan.repository.PlanRepository;
@@ -30,6 +31,10 @@ public class MemberServiceImpl implements MemberService {
     private final GymRepository gymRepository; // From gym module
     private final PlanRepository planRepository;
     private final NotificationEventService notificationEventService;
+    private final NotificationTemplateRepository notificationTemplateRepository;
+
+
+
     @Override
     public Member registerMember(MemberJoinRequest request) {
         // 1. Validate Gym
@@ -67,18 +72,19 @@ public class MemberServiceImpl implements MemberService {
 
         Member savedMember = memberRepository.save(member);
 
-        // 6. Trigger Welcome Notification
-        NotificationTemplate welcomeTemplate = new NotificationTemplate();
-        welcomeTemplate.setName("WELCOME");
-        welcomeTemplate.setTemplateBody("Hello {{name}}, welcome to {{gym_name}}! Your plan expires on {{expiry_date}}.");
-        NotificationChannel channel = new NotificationChannel();
-        channel.setName("N8N");
-        welcomeTemplate.setChannel(channel);// or SMS/WhatsApp depending on your setup
+        // 6. Trigger Welcome Notification using persisted template
+        NotificationTemplate welcomeTemplate = notificationTemplateRepository.findByName("WELCOME")
+                .orElseThrow(() -> new BusinessException("Welcome template not found"));
 
         notificationEventService.createNotification(savedMember, welcomeTemplate);
 
         return savedMember;
+
     }
+
+
+
+
     @Transactional
     public void renewSubscription(Long memberId, Long planId) {
         Member member = memberRepository.findById(memberId)
