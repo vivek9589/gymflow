@@ -11,4 +11,6 @@ public interface AttendanceService {
 
     // Add this for your KPI cards
     long getActiveCount(Long gymId);
+
+    List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId);
 }

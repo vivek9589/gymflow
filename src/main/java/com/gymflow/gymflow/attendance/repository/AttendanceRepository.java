@@ -15,6 +15,8 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     List<Attendance> findByGymIdOrderByCheckInTimeDesc(Long gymId);
 
+    List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId);
+
 
 
 

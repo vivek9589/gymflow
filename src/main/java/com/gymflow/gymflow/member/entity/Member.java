@@ -7,6 +7,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+
+
 @Entity
 @Table(name = "members")
 @Data
@@ -55,6 +57,8 @@ public class Member {
 
     private LocalDate subscriptionStartDate;
     private LocalDate expiryDate;
+
+    private boolean whatsappEnabled = true;
 
     private LocalDateTime createdAt = LocalDateTime.now();
 }

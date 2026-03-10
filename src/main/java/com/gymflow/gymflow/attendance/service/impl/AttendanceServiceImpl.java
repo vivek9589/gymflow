@@ -78,4 +78,10 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .filter(a -> a.getCheckOutTime() == null)
                 .count();
     }
+
+    @Override
+    public List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId) {
+        List<Attendance> logs = attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(memberId);
+        return logs;
+    }
 }

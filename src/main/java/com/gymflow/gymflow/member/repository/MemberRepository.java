@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -21,6 +22,9 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     List<Member> findTop5ByGymIdOrderByCreatedAtDesc(Long gymId);
 
+    List<Member> findByExpiryDate(LocalDate expiryDate);
+
+
     @Query("SELECT SUM(m.currentPlan.price) FROM Member m WHERE m.gym.id = :gymId AND MONTH(m.registrationDate) = :month")
     BigDecimal calculateMonthlyRevenue(Long gymId, int month);
 
@@ -29,6 +33,5 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
             "m.phone LIKE CONCAT('%', :query, '%') OR " +
             "LOWER(m.email) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Member> searchMembersByGym(@Param("gymId") Long gymId, @Param("query") String query);
-
 
 }

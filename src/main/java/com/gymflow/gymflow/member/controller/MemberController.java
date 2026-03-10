@@ -3,6 +3,8 @@ package com.gymflow.gymflow.member.controller;
 
 import com.gymflow.gymflow.common.dto.ApiResponse;
 import com.gymflow.gymflow.member.dto.request.MemberJoinRequest;
+import com.gymflow.gymflow.member.dto.request.MemberUpdateRequest;
+import com.gymflow.gymflow.member.dto.response.MemberResponse;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.service.MemberService;
 import jakarta.validation.Valid;
@@ -41,5 +43,24 @@ public class MemberController {
     public ResponseEntity<ApiResponse<Void>> deleteMember(@PathVariable Long memberId) {
         memberService.deleteMember(memberId);
         return ResponseEntity.ok(ApiResponse.success(null, "Member deleted successfully"));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<MemberResponse>> updateMember(
+            @PathVariable Long id,
+            @Valid @RequestBody MemberUpdateRequest request) {
+
+        // Call service logic and wrap result in your consistent ApiResponse format
+        MemberResponse updatedMember = memberService.updateMember(id, request);
+
+        return ResponseEntity.ok(ApiResponse.success(updatedMember, "Member profile updated successfully."));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('OWNER')") // Keeping security consistent with your delete method
+    public ResponseEntity<ApiResponse<Member>> getMemberById(@PathVariable Long id) {
+        Member member = memberService.getMemberById(id);
+        return ResponseEntity.ok(ApiResponse.success(member, "Member fetched successfully"));
     }
 }

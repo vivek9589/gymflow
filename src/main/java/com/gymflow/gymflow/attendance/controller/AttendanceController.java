@@ -53,4 +53,11 @@ public class AttendanceController {
     public ResponseEntity<ApiResponse<Long>> getActiveStats(@PathVariable Long gymId) {
         return ResponseEntity.ok(ApiResponse.success(attendanceService.getActiveCount(gymId), "Active count fetched"));
     }
+
+
+    @GetMapping("/member/{memberId}")
+    public ResponseEntity<List<Attendance>> getMemberAttendance(@PathVariable Long memberId) {
+        List<Attendance> logs = attendanceService.findByMemberIdOrderByCheckInTimeDesc(memberId);
+        return ResponseEntity.ok(logs);
+    }
 }

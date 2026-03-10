@@ -4,9 +4,14 @@ import com.gymflow.gymflow.common.exception.BusinessException;
 import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
 import com.gymflow.gymflow.member.dto.request.MemberJoinRequest;
+import com.gymflow.gymflow.member.dto.request.MemberUpdateRequest;
+import com.gymflow.gymflow.member.dto.response.MemberResponse;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.member.service.MemberService;
+import com.gymflow.gymflow.notification.entity.NotificationChannel;
+import com.gymflow.gymflow.notification.entity.NotificationTemplate;
+import com.gymflow.gymflow.notification.service.NotificationEventService;
 import com.gymflow.gymflow.plan.entity.Plan;
 import com.gymflow.gymflow.plan.repository.PlanRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,9 +29,8 @@ public class MemberServiceImpl implements MemberService {
     private final MemberRepository memberRepository;
     private final GymRepository gymRepository; // From gym module
     private final PlanRepository planRepository;
-
+    private final NotificationEventService notificationEventService;
     @Override
-    @Transactional
     public Member registerMember(MemberJoinRequest request) {
         // 1. Validate Gym
         Gym gym = gymRepository.findById(Long.parseLong(request.getGymCode()))
@@ -44,7 +48,6 @@ public class MemberServiceImpl implements MemberService {
         member.setBloodGroup(request.getBloodGroup());
         member.setWeight(request.getWeight());
         member.setHeight(request.getHeight());
-
         member.setDob(request.getDob());
         member.setOccupation(request.getOccupation());
         member.setFatherName(request.getFatherName());
@@ -60,12 +63,22 @@ public class MemberServiceImpl implements MemberService {
         member.setExpiryDate(LocalDate.now().plusDays(plan.getDurationInDays()));
 
         // 5. Status Management
-        // Set to PENDING so the owner can verify the payment before making them ACTIVE
-        member.setStatus("PENDING");
+        member.setStatus("PENDING"); // owner verifies payment before ACTIVE
 
-        return memberRepository.save(member);
+        Member savedMember = memberRepository.save(member);
+
+        // 6. Trigger Welcome Notification
+        NotificationTemplate welcomeTemplate = new NotificationTemplate();
+        welcomeTemplate.setName("WELCOME");
+        welcomeTemplate.setTemplateBody("Hello {{name}}, welcome to {{gym_name}}! Your plan expires on {{expiry_date}}.");
+        NotificationChannel channel = new NotificationChannel();
+        channel.setName("N8N");
+        welcomeTemplate.setChannel(channel);// or SMS/WhatsApp depending on your setup
+
+        notificationEventService.createNotification(savedMember, welcomeTemplate);
+
+        return savedMember;
     }
-
     @Transactional
     public void renewSubscription(Long memberId, Long planId) {
         Member member = memberRepository.findById(memberId)
@@ -98,6 +111,39 @@ public class MemberServiceImpl implements MemberService {
         memberRepository.deleteById(memberId);
     }
 
+    @Override
+    @Transactional
+    public MemberResponse updateMember(Long id, MemberUpdateRequest request) {
+        // 1. Find the existing member or throw a clean business exception
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("Member not found with id: " + id));
+
+        // 2. Map updated fields from DTO to Entity
+        member.setName(request.getName()); //
+        member.setPhone(request.getPhone()); //
+        member.setEmail(request.getEmail()); //
+        member.setWeight(request.getWeight()); //
+        member.setHeight(request.getHeight()); //
+        member.setPermanentAddress(request.getPermanentAddress()); //
+        member.setOccupation(request.getOccupation()); //
+        member.setMedicalConditions(request.getMedicalConditions()); //
+
+        // Allow owner to manually override status if provided in the request
+        if (request.getStatus() != null) {
+            member.setStatus(request.getStatus());
+        }
+
+        // 3. Save and return as a clean Response DTO
+        Member updatedMember = memberRepository.save(member);
+        return mapToResponse(updatedMember);
+    }
+
+
+    public Member getMemberById(Long id) {
+        return memberRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Member not found with id: " + id));
+    }
+
 
     @Override
     public List<Member> searchMembers(Long gymId, String query) {
@@ -108,5 +154,27 @@ public class MemberServiceImpl implements MemberService {
 
         // Calling the custom query we added to MemberRepository
         return memberRepository.searchMembersByGym(gymId, query.trim());
+    }
+
+
+    private MemberResponse mapToResponse(Member member) {
+        return MemberResponse.builder()
+                .id(member.getId())
+                .name(member.getName()) //
+                .phone(member.getPhone()) //
+                .email(member.getEmail()) //
+                .status(member.getStatus()) //
+                .bloodGroup(member.getBloodGroup()) //
+                .weight(member.getWeight()) //
+                .height(member.getHeight()) //
+                .occupation(member.getOccupation()) //
+                .permanentAddress(member.getPermanentAddress()) //
+                .medicalConditions(member.getMedicalConditions()) //
+                .registrationDate(member.getRegistrationDate()) //
+                .expiryDate(member.getExpiryDate()) //
+                .initialPayment(member.getInitialPayment()) //
+                // Extract the plan name safely to avoid NullPointerException
+                .planName(member.getCurrentPlan() != null ? member.getCurrentPlan().getName() : "No Active Plan")
+                .build();
     }
 }
