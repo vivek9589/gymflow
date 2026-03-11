@@ -10,26 +10,18 @@ import lombok.Builder;
 
 @Entity
 @Table(name = "notification_settings")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class NotificationSetting {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @OneToOne
-    @JoinColumn(name = "gym_id")
+    @OneToOne @JoinColumn(name = "gym_id")
     private Gym gym;
 
     private boolean welcomeEnabled;
-
     private boolean expiryEnabled;
-
     private boolean promotionEnabled;
-
     private boolean holidayEnabled;
 }
