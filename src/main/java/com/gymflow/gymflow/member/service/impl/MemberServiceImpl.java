@@ -9,10 +9,9 @@ import com.gymflow.gymflow.member.dto.response.MemberResponse;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.member.service.MemberService;
-import com.gymflow.gymflow.notification.entity.NotificationChannel;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
-import com.gymflow.gymflow.notification.service.NotificationEventService;
+import com.gymflow.gymflow.notification.service.NotificationService;
 import com.gymflow.gymflow.plan.entity.Plan;
 import com.gymflow.gymflow.plan.repository.PlanRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +29,7 @@ public class MemberServiceImpl implements MemberService {
     private final MemberRepository memberRepository;
     private final GymRepository gymRepository; // From gym module
     private final PlanRepository planRepository;
-    private final NotificationEventService notificationEventService;
+    private final NotificationService notificationService;
     private final NotificationTemplateRepository notificationTemplateRepository;
 
 
@@ -76,7 +75,7 @@ public class MemberServiceImpl implements MemberService {
         NotificationTemplate welcomeTemplate = notificationTemplateRepository.findByName("WELCOME")
                 .orElseThrow(() -> new BusinessException("Welcome template not found"));
 
-        notificationEventService.createNotification(savedMember, welcomeTemplate);
+        notificationService.sendNotification(savedMember.getId(), welcomeTemplate.getId());
 
         return savedMember;
 

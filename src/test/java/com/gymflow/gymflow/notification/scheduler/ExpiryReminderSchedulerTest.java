@@ -4,7 +4,7 @@ import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
-import com.gymflow.gymflow.notification.service.NotificationEventService;
+import com.gymflow.gymflow.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -22,7 +22,7 @@ class ExpiryReminderSchedulerTest {
     private MemberRepository memberRepository;
 
     @Mock
-    private NotificationEventService notificationEventService;
+    private NotificationService notificationService;
 
     @Mock
     private NotificationTemplateRepository templateRepository;
@@ -55,8 +55,8 @@ class ExpiryReminderSchedulerTest {
         scheduler.sendExpiryReminders();
 
         // Assert
-        verify(notificationEventService, times(1))
-                .createNotification(member, template);
+        verify(notificationService, times(1))
+                .sendNotification(member.getId(), template.getId());
     }
 
     @Test
@@ -66,6 +66,6 @@ class ExpiryReminderSchedulerTest {
 
         scheduler.sendExpiryReminders();
 
-        verifyNoInteractions(notificationEventService);
+        verifyNoInteractions(notificationService);
     }
 }

@@ -1,8 +1,8 @@
 package com.gymflow.gymflow.notification.service;
 
-import com.gymflow.gymflow.member.entity.Member;
-import com.gymflow.gymflow.notification.entity.NotificationTemplate;
+
 
 public interface NotificationService {
-    void sendNotification(Member member, NotificationTemplate template);
+    void sendNotification(Long memberId, Long templateId);
+    int sendToAll(Long templateId);
 }

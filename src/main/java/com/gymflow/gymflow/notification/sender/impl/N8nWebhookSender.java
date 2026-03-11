@@ -6,6 +6,7 @@ import com.gymflow.gymflow.notification.enums.ChannelType;
 import com.gymflow.gymflow.notification.sender.NotificationSender;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -16,6 +17,7 @@ import java.util.Map;
 
 @Slf4j
 @Component
+@Primary
 public class N8nWebhookSender implements NotificationSender {
 
     private final RestTemplate restTemplate;
