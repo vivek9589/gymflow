@@ -5,16 +5,13 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 /**
- * Request DTO for user login.
- * Contains email and password fields with validation.
+ * Request DTO for initiating a password reset.
+ * Contains only the user's email address.
  */
 @Data
-public class LoginRequest {
+public class ForgotPasswordRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
     private String email;
-
-    @NotBlank(message = "Password is required")
-    private String password;
 }

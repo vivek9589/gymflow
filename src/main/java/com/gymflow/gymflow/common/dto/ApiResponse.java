@@ -2,9 +2,14 @@ package com.gymflow.gymflow.common.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
-
 import java.time.LocalDateTime;
 
+/**
+ * Standard API response wrapper for all endpoints.
+ * Ensures consistent response format across the application.
+ *
+ * @param <T> The type of data returned in the response
+ */
 @Data
 @AllArgsConstructor
 public class ApiResponse<T> {

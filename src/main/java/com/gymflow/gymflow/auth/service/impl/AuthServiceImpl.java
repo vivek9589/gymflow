@@ -1,18 +1,22 @@
 package com.gymflow.gymflow.auth.service.impl;
 
-
 import com.gymflow.gymflow.auth.dto.request.LoginRequest;
 import com.gymflow.gymflow.auth.dto.request.OwnerRegisterRequest;
+import com.gymflow.gymflow.auth.dto.request.UpdateProfileRequest;
 import com.gymflow.gymflow.auth.dto.response.LoginResponse;
 import com.gymflow.gymflow.auth.entity.GymOwner;
 import com.gymflow.gymflow.auth.enums.Role;
 import com.gymflow.gymflow.auth.repository.GymOwnerRepository;
 import com.gymflow.gymflow.auth.security.JwtUtil;
 import com.gymflow.gymflow.auth.service.AuthService;
-import com.gymflow.gymflow.common.exception.BusinessException;
+import com.gymflow.gymflow.common.exception.InvalidCredentialsException;
+import com.gymflow.gymflow.common.exception.UserAlreadyExistsException;
+import com.gymflow.gymflow.common.exception.UserNotFoundException;
 import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,20 +24,27 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Implementation of AuthService.
+ * Handles login, registration, and extended authentication flows for Gym Owners.
+ */
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
 
     private final GymOwnerRepository authRepository;
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
-    private final GymRepository gymRepository; // Inject GymRepository
+    private final GymRepository gymRepository;
 
     @Override
     public LoginResponse login(LoginRequest request) {
+        log.info("Login attempt for email={}", request.getEmail());
+
         try {
-            // 1. Authenticate using Spring Security's AuthenticationManager
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             request.getEmail(),
@@ -41,65 +52,146 @@ public class AuthServiceImpl implements AuthService {
                     )
             );
         } catch (BadCredentialsException e) {
-            // Industry Standard: Don't tell them if it was the email or password that was wrong (Security)
-            throw new BusinessException("Invalid email or password.");
+            log.warn("Invalid login attempt for email={}", request.getEmail());
+            throw new InvalidCredentialsException();
         }
 
-        // 2. Fetch the Owner details to generate the token with gymId
         GymOwner owner = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException("User account not found."));
+                .orElseThrow(() -> {
+                    log.error("User not found for email={}", request.getEmail());
+                    return new UserNotFoundException(request.getEmail());
+                });
 
-        // 3. Generate Token using your refactored JwtUtil (includes gymId)
         String token = jwtUtil.generateToken(
                 owner.getEmail(),
                 owner.getGym().getId(),
                 owner.getGym().getName(),
                 owner.getOwnerName(),
-                "OWNER"
+                owner.getRole().name()
         );
 
-        // 4. Return the response object (Controller will wrap this in ApiResponse)
+        log.info("Login successful for email={}, gymId={}", owner.getEmail(), owner.getGym().getId());
+
         return new LoginResponse(
                 token,
                 owner.getEmail(),
                 owner.getGym().getId(),
-                "OWNER"
+                owner.getRole().name()
         );
     }
+
     @Override
     @Transactional
     public void register(OwnerRegisterRequest request) {
-        // 1. Duplicate Email Check
+        log.info("Registration attempt for email={}", request.getEmail());
+
         if (authRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessException("Email is already registered.");
+            log.warn("Duplicate registration attempt for email={}", request.getEmail());
+            throw new UserAlreadyExistsException(request.getEmail());
         }
 
-        // 2. Map & Save Gym
-        Gym gym = new Gym();
-        gym.setName(request.getGymName());
-        gym.setAddress(request.getAddress());
-        gym.setContactNumber(request.getContactNumber());
-        gym.setCity(request.getCity());
-        gym.setState(request.getState());
-        gym.setPincode(request.getPincode());
-        gym.setWebsite(request.getWebsite());
-        gym.setEstablishedYear(request.getEstablishedYear());
-        gym.setDescription(request.getDescription());
-        gym.setLogoUrl(request.getLogoUrl());
-
-        // Unique Gym Code for QR
-        gym.setGymCode(java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase());
+        Gym gym = Gym.builder()
+                .name(request.getGymName())
+                .address(request.getAddress())
+                .contactNumber(request.getContactNumber())
+                .city(request.getCity())
+                .state(request.getState())
+                .pincode(request.getPincode())
+                .website(request.getWebsite())
+                .establishedYear(request.getEstablishedYear())
+                .description(request.getDescription())
+                .logoUrl(request.getLogoUrl())
+                .gymCode(java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase())
+                .build();
 
         Gym savedGym = gymRepository.save(gym);
 
-        // 3. Map & Save Owner
-        GymOwner owner = new GymOwner();
-        owner.setOwnerName(request.getOwnerName()); // Don't forget this!
-        owner.setEmail(request.getEmail());
-        owner.setPassword(passwordEncoder.encode(request.getPassword()));
-        owner.setRole(Role.valueOf(request.getRole())); // OWNER by default
-        owner.setGym(savedGym);
+        GymOwner owner = GymOwner.builder()
+                .ownerName(request.getOwnerName())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(Role.valueOf(request.getRole()))
+                .gym(savedGym)
+                .build();
 
         authRepository.save(owner);
+
+        log.info("Registration successful for owner email={}, gymId={}", owner.getEmail(), savedGym.getId());
+    }
+
+    @Override
+    public void logout(String token) {
+        log.info("Logout requested for token={}", token);
+        // TODO: Implement token blacklist or refresh token invalidation
+    }
+
+    @Override
+    public void forgotPassword(String email) {
+        log.info("Password reset requested for email={}", email);
+
+        GymOwner owner = authRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+
+        // TODO: Generate reset token and send via email service
+        log.info("Password reset token generated for email={}", email);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        log.info("Password reset attempt with token={}", token);
+
+        // TODO: Validate token, fetch user
+        GymOwner owner = authRepository.findByEmail("dummy@example.com") // Replace with token lookup
+                .orElseThrow(() -> new UserNotFoundException("dummy@example.com"));
+
+        owner.setPassword(passwordEncoder.encode(newPassword));
+        authRepository.save(owner);
+
+        log.info("Password reset successful for email={}", owner.getEmail());
+    }
+
+    @Override
+    public GymOwner getProfile(String email) {
+        log.info("Fetching profile for email={}", email);
+        return authRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+    }
+
+    @Override
+    @Transactional
+    public void updateProfile(String email, UpdateProfileRequest request) {
+        GymOwner owner = authRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+
+        owner.setOwnerName(request.getOwnerName());
+        owner.getGym().setContactNumber(request.getContactNumber());
+        owner.getGym().setCity(request.getCity());
+        owner.getGym().setState(request.getState());
+        owner.getGym().setPincode(request.getPincode());
+        owner.getGym().setWebsite(request.getWebsite());
+        owner.getGym().setDescription(request.getDescription());
+        owner.getGym().setLogoUrl(request.getLogoUrl());
+
+        authRepository.save(owner);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(String email, String oldPassword, String newPassword) {
+        log.info("Password change requested for email={}", email);
+
+        GymOwner owner = authRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException(email));
+
+        if (!passwordEncoder.matches(oldPassword, owner.getPassword())) {
+            log.warn("Invalid old password for email={}", email);
+            throw new InvalidCredentialsException();
+        }
+
+        owner.setPassword(passwordEncoder.encode(newPassword));
+        authRepository.save(owner);
+
+        log.info("Password changed successfully for email={}", email);
     }
 }

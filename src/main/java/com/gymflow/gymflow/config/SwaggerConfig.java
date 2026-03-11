@@ -8,6 +8,9 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Swagger/OpenAPI configuration for API documentation.
+ */
 @Configuration
 public class SwaggerConfig {
 

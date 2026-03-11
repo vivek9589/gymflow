@@ -1,7 +1,13 @@
 package com.gymflow.gymflow.auth.enums;
 
+/**
+ * Defines roles available in the system.
+ * OWNER - Full access to their gym
+ * STAFF - Limited access
+ * ADMIN - System-wide access
+ */
 public enum Role {
-    OWNER,    // The Gym Owner (Full access to their specific gym)
-    STAFF,    // Employees (Limited access to their gym)
-    ADMIN // You (Access to manage all gyms/billing)
+    OWNER,
+    STAFF,
+    ADMIN
 }
