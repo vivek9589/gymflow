@@ -4,7 +4,6 @@ import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.notification.entity.NotificationEvent;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.enums.NotificationStatus;
-import com.gymflow.gymflow.notification.service.NotificationEventService;
 import com.gymflow.gymflow.notification.repository.NotificationEventRepository;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;

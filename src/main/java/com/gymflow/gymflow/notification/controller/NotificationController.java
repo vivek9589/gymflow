@@ -1,74 +1,51 @@
 package com.gymflow.gymflow.notification.controller;
 
 import com.gymflow.gymflow.common.exception.ResourceNotFoundException;
-import com.gymflow.gymflow.member.entity.Member;
-import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.notification.dto.request.NotificationRequest;
-import com.gymflow.gymflow.notification.dto.response.NotificationResponse;
 import com.gymflow.gymflow.notification.entity.NotificationEvent;
-import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationEventRepository;
-import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
-import com.gymflow.gymflow.notification.service.NotificationEventService;
-import lombok.extern.slf4j.Slf4j;
+import com.gymflow.gymflow.notification.service.NotificationService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
-import java.util.Optional;
+import com.gymflow.gymflow.notification.dto.request.PromotionRequest;
+import org.springframework.web.bind.annotation.*;
 
 
-@Slf4j
 @RestController
+@RequiredArgsConstructor
 @RequestMapping("/api/notifications")
 public class NotificationController {
 
-    private final NotificationEventService eventService;
+    private final NotificationService notificationService;
     private final NotificationEventRepository eventRepository;
-    private final MemberRepository memberRepository;
-    private final NotificationTemplateRepository templateRepository;
 
-    public NotificationController(NotificationEventService eventService,
-                                  NotificationEventRepository eventRepository,
-                                  MemberRepository memberRepository,
-                                  NotificationTemplateRepository templateRepository) {
-        this.eventService = eventService;
-        this.eventRepository = eventRepository;
-        this.memberRepository = memberRepository;
-        this.templateRepository = templateRepository;
-    }
-
-
+    // Send to Specific Member
     @PostMapping("/send")
-    public ResponseEntity<NotificationResponse> sendNotification(@RequestBody NotificationRequest request) {
-        log.info("Received send notification request for member {} with template {}",
-                request.getMemberId(), request.getTemplateId());
-
-        Member member = memberRepository.findById(request.getMemberId())
-                .orElseThrow(() -> new ResourceNotFoundException("Member not found"));
-
-        NotificationTemplate template = templateRepository.findById(request.getTemplateId())
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found"));
-
-        eventService.createNotification(member, template);
-
-        Optional<NotificationEvent> event =
-                eventRepository.findTopByMemberIdOrderByCreatedAtDesc(member.getId());
-
-        return ResponseEntity.ok(new NotificationResponse(event.get().getId(), event.get().getStatus(), "Notification processed"));
+    public ResponseEntity<String> send(@RequestBody NotificationRequest request) {
+        notificationService.sendNotification(request.getMemberId(), request.getTemplateId());
+        return ResponseEntity.ok("Notification triggered successfully");
     }
 
+    // Send to All Members (Promotion/Holiday)
+    @PostMapping("/promotion/all")
+    public ResponseEntity<String> sendToAll(@RequestBody PromotionRequest request) {
+        int count = notificationService.sendToAll(request.getTemplateId());
+        return ResponseEntity.ok("Successfully processed notifications for " + count + " members.");
+    }
+
+    // Get Log by ID
     @GetMapping("/{id}/status")
-    public ResponseEntity<NotificationResponse> getStatus(@PathVariable Long id) {
+    public ResponseEntity<NotificationEvent> getStatus(@PathVariable Long id) {
         NotificationEvent event = eventRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
-
-        return ResponseEntity.ok(new NotificationResponse(event.getId(), event.getStatus(), event.getErrorMessage()));
+        return ResponseEntity.ok(event);
     }
 
+    // Get All Logs
     @GetMapping("/logs")
     public ResponseEntity<List<NotificationEvent>> getLogs() {
-        List<NotificationEvent> events = eventRepository.findAll();
-        return ResponseEntity.ok(events);
+        return ResponseEntity.ok(eventRepository.findAll());
     }
 }

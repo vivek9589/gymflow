@@ -4,7 +4,8 @@ import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
-import com.gymflow.gymflow.notification.service.NotificationEventService;
+import com.gymflow.gymflow.notification.service.NotificationService;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,22 +19,16 @@ import java.util.Optional;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ExpiryReminderScheduler {
 
     private final MemberRepository memberRepository;
-    private final NotificationEventService notificationEventService;
+    private final NotificationService notificationService;
     private final NotificationTemplateRepository templateRepository;
 
     @Value("${scheduler.expiry-reminder.cron:0 0 2 * * ?}")
     private String cronExpression;
 
-    public ExpiryReminderScheduler(MemberRepository memberRepository,
-                                   NotificationEventService notificationEventService,
-                                   NotificationTemplateRepository templateRepository) {
-        this.memberRepository = memberRepository;
-        this.notificationEventService = notificationEventService;
-        this.templateRepository = templateRepository;
-    }
 
     /**
      * Scheduled job to send expiry reminders to members whose subscriptions
@@ -58,7 +53,7 @@ public class ExpiryReminderScheduler {
 
         for (Member member : members) {
             try {
-                notificationEventService.createNotification(member, template);
+                notificationService.sendNotification(member.getId(), template.getId());
                 log.info("Created expiry reminder event for {} ({})", member.getName(), member.getPhone());
                 successCount++;
             } catch (Exception e) {
