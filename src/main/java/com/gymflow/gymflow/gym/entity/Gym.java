@@ -4,14 +4,18 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-
-
+/**
+ * Represents a Gym entity with details like name, address, and contact info.
+ */
 @Entity
 @Table(name = "gyms")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Gym {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -34,5 +38,6 @@ public class Gym {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

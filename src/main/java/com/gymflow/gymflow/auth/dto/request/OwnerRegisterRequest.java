@@ -1,11 +1,14 @@
 package com.gymflow.gymflow.auth.dto.request;
 
-
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Request DTO for registering a Gym Owner and their Gym.
+ * Includes both owner details and gym details.
+ */
 @Data
 public class OwnerRegisterRequest {
 
@@ -18,7 +21,7 @@ public class OwnerRegisterRequest {
     private String email;
 
     @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must be at least 6 characters")
+    @Size(min = 8, message = "Password must be at least 8 characters long")
     private String password;
 
     // Gym details
@@ -29,14 +32,11 @@ public class OwnerRegisterRequest {
     private String address;
 
     private String contactNumber;
-
     private String city;
     private String state;
     private String pincode;
-
     private String website;
     private Integer establishedYear;
-
     private String logoUrl;
     private String description;
 

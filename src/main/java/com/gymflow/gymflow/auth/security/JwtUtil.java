@@ -9,30 +9,33 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+/**
+ * Utility class for generating and validating JWT tokens.
+ */
 @Component
 public class JwtUtil {
 
     @Value("${jwt.secret}")
     private String secret;
 
-    private final long EXPIRATION = 1000 * 60 * 60 * 10; // 10 hours
+    @Value("${jwt.expiration:3600000}") // Default 1 hour
+    private long expiration;
 
-    // In 0.12+, we use SecretKey specifically
     private SecretKey getSigningKey() {
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateToken(String email, Long gymId,String gymName,String ownerName, String role) {
+    public String generateToken(String email, Long gymId, String gymName, String ownerName, String role) {
         return Jwts.builder()
-                .subject(email) // .setSubject is now .subject
+                .subject(email)
                 .claim("gymId", gymId)
-                .claim("gymName",gymName)
-                .claim("ownerName",ownerName)
+                .claim("gymName", gymName)
+                .claim("ownerName", ownerName)
                 .claim("role", role)
-                .issuedAt(new Date()) // .setIssuedAt is now .issuedAt
-                .expiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(getSigningKey()) // Algorithm is detected automatically
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey())
                 .compact();
     }
 
@@ -46,7 +49,6 @@ public class JwtUtil {
 
     public boolean validateToken(String token) {
         try {
-            // .parserBuilder().build() is now .parser().verifyWith().build()
             Jwts.parser()
                     .verifyWith(getSigningKey())
                     .build()
@@ -61,7 +63,7 @@ public class JwtUtil {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
-                .parseSignedClaims(token) // parseClaimsJws is now parseSignedClaims
-                .getPayload(); // getBody is now getPayload
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }
