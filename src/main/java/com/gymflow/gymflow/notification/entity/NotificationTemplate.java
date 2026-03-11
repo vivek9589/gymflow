@@ -8,12 +8,11 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
 
+
+
 @Entity
 @Table(name = "notification_templates")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class NotificationTemplate {
 
     @Id
@@ -27,7 +26,6 @@ public class NotificationTemplate {
 
     private LocalDateTime createdAt;
 
-    @ManyToOne
-    @JoinColumn(name = "channel_id")
+    @ManyToOne @JoinColumn(name = "channel_id")
     private NotificationChannel channel;
 }
