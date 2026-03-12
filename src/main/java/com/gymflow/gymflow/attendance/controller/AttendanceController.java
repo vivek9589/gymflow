@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 
@@ -57,5 +58,22 @@ public class AttendanceController {
     public ResponseEntity<ApiResponse<List<Attendance>>> getMemberAttendance(@PathVariable Long memberId) {
         log.info("Fetching attendance logs for memberId={}", memberId);
         return ResponseEntity.ok(ApiResponse.success(attendanceService.findByMemberIdOrderByCheckInTimeDesc(memberId), "Attendance logs fetched"));
+    }
+
+    @GetMapping("/today/{gymId}")
+    public ResponseEntity<ApiResponse<List<Attendance>>> getTodayAttendance(@PathVariable Long gymId) {
+        log.info("API call: Today's attendance for gymId={}", gymId);
+        return ResponseEntity.ok(ApiResponse.success(
+                attendanceService.getTodayAttendance(gymId), "Today's attendance fetched"));
+    }
+
+    @GetMapping("/report/{gymId}")
+    public ResponseEntity<ApiResponse<List<Attendance>>> getAttendanceReport(
+            @PathVariable Long gymId,
+            @RequestParam LocalDate startDate,
+            @RequestParam LocalDate endDate) {
+        log.info("API call: Attendance report for gymId={} from {} to {}", gymId, startDate, endDate);
+        return ResponseEntity.ok(ApiResponse.success(
+                attendanceService.getAttendanceReport(gymId, startDate, endDate), "Attendance report fetched"));
     }
 }

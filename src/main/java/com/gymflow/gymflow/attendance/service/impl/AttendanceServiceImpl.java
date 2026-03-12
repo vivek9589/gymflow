@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -100,5 +101,23 @@ public class AttendanceServiceImpl implements AttendanceService {
     public List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId) {
         log.info("Fetching attendance logs for memberId={}", memberId);
         return attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(memberId);
+    }
+
+    @Override
+    public List<Attendance> getTodayAttendance(Long gymId) {
+        log.info("Fetching today's attendance for gymId={}", gymId);
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(23, 59, 59);
+        return attendanceRepository.findByGymIdAndCheckInTimeBetweenOrderByCheckInTimeDesc(
+                gymId, startOfDay, endOfDay);
+    }
+
+    @Override
+    public List<Attendance> getAttendanceReport(Long gymId, LocalDate startDate, LocalDate endDate) {
+        log.info("Fetching attendance report for gymId={} from {} to {}", gymId, startDate, endDate);
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.atTime(23, 59, 59);
+        return attendanceRepository.findByGymIdAndCheckInTimeBetweenOrderByCheckInTimeDesc(
+                gymId, start, end);
     }
 }
