@@ -1,13 +1,15 @@
 package com.gymflow.gymflow.gym.service;
 
 
-import com.gymflow.gymflow.gym.dto.GymDTO;
+
+import com.gymflow.gymflow.gym.dto.request.GymRequest;
+import com.gymflow.gymflow.gym.dto.response.GymResponse;
 
 import java.util.List;
 
 public interface GymService {
-    GymDTO getGymById(Long id);
-    GymDTO getGymByCode(String code);
-    GymDTO updateGym(Long id, GymDTO gymDTO);
-    List<GymDTO> getAllGyms(); // For System Admin
+    GymResponse getGymById(Long id);
+    GymResponse getGymByCode(String code);
+    GymResponse updateGym(Long id, GymRequest gymRequest);
+    List<GymResponse> getAllGyms();
 }
