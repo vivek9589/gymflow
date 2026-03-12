@@ -4,6 +4,8 @@ package com.gymflow.gymflow.attendance.repository;
 import com.gymflow.gymflow.attendance.entity.Attendance;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.List;
 
@@ -16,6 +18,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     List<Attendance> findByGymIdOrderByCheckInTimeDesc(Long gymId);
 
     List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId);
+
+    List<Attendance> findByGymIdAndCheckInTimeBetweenOrderByCheckInTimeDesc(
+            Long gymId, LocalDateTime start, LocalDateTime end);
 
 
 

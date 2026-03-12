@@ -121,4 +121,52 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error(ex.getMessage()));
     }
+
+
+    @ExceptionHandler(AttendanceNotFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handleAttendanceNotFound(AttendanceNotFoundException ex) {
+        log.warn("Attendance not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(AttendanceAlreadyCheckedInException.class)
+    public ResponseEntity<ApiResponse<String>> handleAttendanceAlreadyCheckedIn(AttendanceAlreadyCheckedInException ex) {
+        log.warn("Attendance conflict: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    // -------------------- Attendance Exceptions --------------------
+
+    @ExceptionHandler(MembershipExpiredException.class)
+    public ResponseEntity<ApiResponse<String>> handleMembershipExpired(MembershipExpiredException ex) {
+        log.warn("Membership expired: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(AdmissionPendingException.class)
+    public ResponseEntity<ApiResponse<String>> handleAdmissionPending(AdmissionPendingException ex) {
+        log.warn("Admission pending: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    // -------------------- PLAN Exceptions --------------------
+    @ExceptionHandler(PlanNotFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handlePlanNotFound(PlanNotFoundException ex) {
+        log.warn("Plan not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(PlanAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<String>> handlePlanAlreadyExists(PlanAlreadyExistsException ex) {
+        log.warn("Plan conflict: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+
 }

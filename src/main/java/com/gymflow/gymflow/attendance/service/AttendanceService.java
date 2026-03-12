@@ -3,6 +3,7 @@ package com.gymflow.gymflow.attendance.service;
 
 import com.gymflow.gymflow.attendance.entity.Attendance;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface AttendanceService {
@@ -13,4 +14,7 @@ public interface AttendanceService {
     long getActiveCount(Long gymId);
 
     List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId);
+
+    List<Attendance> getTodayAttendance(Long gymId);
+    List<Attendance> getAttendanceReport(Long gymId, LocalDate startDate, LocalDate endDate);
 }
