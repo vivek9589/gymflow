@@ -1,4 +1,4 @@
-package com.gymflow.gymflow.gym.dto;
+package com.gymflow.gymflow.gym.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;

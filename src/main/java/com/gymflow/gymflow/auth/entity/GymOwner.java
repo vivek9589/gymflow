@@ -4,6 +4,9 @@ import com.gymflow.gymflow.auth.enums.Role;
 import com.gymflow.gymflow.gym.entity.Gym;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
 
 /**
@@ -41,9 +44,13 @@ public class GymOwner {
     private Role role = Role.OWNER;
 
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    @JoinColumn(name = "gym_id", referencedColumnName = "id")
+    @JoinColumn(name = "gym_id", referencedColumnName = "id", nullable = false)
     private Gym gym;
 
+    @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 }

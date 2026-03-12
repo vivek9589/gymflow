@@ -92,4 +92,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
     }
 
+    @ExceptionHandler(GymNotFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handleGymNotFound(GymNotFoundException ex) {
+        log.warn("Gym not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
 }
