@@ -5,13 +5,17 @@ import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDateTime;
 @Entity
 @Table(name = "attendance")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Attendance {
 
     @Id
@@ -26,11 +30,15 @@ public class Attendance {
     @JoinColumn(name = "gym_id", nullable = false)
     private Gym gym;
 
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     private LocalDateTime checkInTime;
 
     private LocalDateTime checkOutTime;
 
-    // Standard for logs: Never update the record except for the Check-out
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 }

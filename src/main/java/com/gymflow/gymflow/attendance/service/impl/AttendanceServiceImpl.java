@@ -3,11 +3,13 @@ package com.gymflow.gymflow.attendance.service.impl;
 import com.gymflow.gymflow.attendance.entity.Attendance;
 import com.gymflow.gymflow.attendance.repository.AttendanceRepository;
 import com.gymflow.gymflow.attendance.service.AttendanceService;
-import com.gymflow.gymflow.common.exception.BusinessException;
+import com.gymflow.gymflow.common.exception.*;
+import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,7 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AttendanceServiceImpl implements AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
@@ -27,25 +30,34 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     @Transactional
     public String toggleAttendance(Long memberId, Long gymId) {
-        // 1. Validate Member
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException("Member not found"));
+        log.info("Toggling attendance for memberId={} at gymId={}", memberId, gymId);
 
-        // 2. Validate Gym Ownership (Security Check)
+        // Validate Member
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new MemberNotFoundException("Member not found with id: " + memberId));
+
+        // Validate Gym
+        Gym gym = gymRepository.findById(gymId)
+                .orElseThrow(() -> new GymNotFoundException("Gym not found with id: " + gymId));
+
+        // Ensure member belongs to this gym
         if (!member.getGym().getId().equals(gymId)) {
-            throw new BusinessException("Member does not belong to this Gym");
+            log.warn("Member {} does not belong to gym {}", memberId, gymId);
+            throw new GymNotFoundException("Member does not belong to this gym");
         }
 
-        // 3. Status Check
+        // Membership status checks
         if ("EXPIRED".equalsIgnoreCase(member.getStatus())) {
-            throw new BusinessException("Membership expired. Access Denied.");
+            log.warn("Member {} attempted check-in with expired membership", memberId);
+            throw new MembershipExpiredException("Membership expired. Access denied.");
         }
 
         if ("PENDING".equalsIgnoreCase(member.getStatus())) {
-            throw new BusinessException("Admission pending. Please contact the manager.");
+            log.warn("Member {} attempted check-in with pending admission", memberId);
+            throw new AdmissionPendingException("Admission pending. Please contact the manager.");
         }
 
-        // 4. Toggle Session Logic
+        // Toggle session logic
         Optional<Attendance> activeSession = attendanceRepository
                 .findFirstByMemberIdAndCheckOutTimeIsNullOrderByCheckInTimeDesc(memberId);
 
@@ -53,26 +65,31 @@ public class AttendanceServiceImpl implements AttendanceService {
             Attendance attendance = activeSession.get();
             attendance.setCheckOutTime(LocalDateTime.now());
             attendanceRepository.save(attendance);
-            return "Check-out successful at " + attendance.getCheckOutTime().format(DateTimeFormatter.ofPattern("hh:mm a"));
+            log.info("Member {} checked out at {}", member.getName(), attendance.getCheckOutTime());
+            return "Check-out successful at " +
+                    attendance.getCheckOutTime().format(DateTimeFormatter.ofPattern("hh:mm a"));
         } else {
-            Attendance attendance = new Attendance();
-            attendance.setMember(member);
-            attendance.setGym(member.getGym());
-            attendance.setCheckInTime(LocalDateTime.now());
+            Attendance attendance = Attendance.builder()
+                    .member(member)
+                    .gym(member.getGym())
+                    .checkInTime(LocalDateTime.now())
+                    .build();
             attendanceRepository.save(attendance);
-            return "Check-in successful at " + attendance.getCheckInTime().format(DateTimeFormatter.ofPattern("hh:mm a"));
+            log.info("Member {} checked in at {}", member.getName(), attendance.getCheckInTime());
+            return "Check-in successful at " +
+                    attendance.getCheckInTime().format(DateTimeFormatter.ofPattern("hh:mm a"));
         }
     }
 
     @Override
     public List<Attendance> getRecentAttendance(Long gymId) {
+        log.info("Fetching recent attendance for gymId={}", gymId);
         return attendanceRepository.findByGymIdOrderByCheckInTimeDesc(gymId);
     }
 
-
     @Override
     public long getActiveCount(Long gymId) {
-        // We filter the recent list to see who hasn't checked out
+        log.info("Fetching active count for gymId={}", gymId);
         return attendanceRepository.findByGymIdOrderByCheckInTimeDesc(gymId)
                 .stream()
                 .filter(a -> a.getCheckOutTime() == null)
@@ -81,7 +98,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     @Override
     public List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId) {
-        List<Attendance> logs = attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(memberId);
-        return logs;
+        log.info("Fetching attendance logs for memberId={}", memberId);
+        return attendanceRepository.findByMemberIdOrderByCheckInTimeDesc(memberId);
     }
 }

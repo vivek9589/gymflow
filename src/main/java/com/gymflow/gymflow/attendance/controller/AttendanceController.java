@@ -7,57 +7,55 @@ import com.gymflow.gymflow.common.dto.ApiResponse;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+
 @RestController
 @RequestMapping("/api/attendance")
 @RequiredArgsConstructor
+@Slf4j
 public class AttendanceController {
 
     private final AttendanceService attendanceService;
-    private final MemberService memberService; // Inject this to handle the manual search
+    private final MemberService memberService;
 
-    // 1. MANUAL & QR TOGGLE: The "Action" button
-    // This is used for both QR scans and the "Check In" button in your manual search
     @PostMapping("/scan/{gymId}/{memberId}")
     public ResponseEntity<ApiResponse<String>> scanAttendance(
             @PathVariable Long gymId,
             @PathVariable Long memberId) {
-
-        // The service now handles logic using gymId
+        log.info("Scan attendance request: gymId={}, memberId={}", gymId, memberId);
         String message = attendanceService.toggleAttendance(memberId, gymId);
-
         return ResponseEntity.ok(ApiResponse.success(null, message));
     }
 
-    // 2. SEARCH: For the "Manual Entry" Dialog
     @GetMapping("/search-member")
     public ResponseEntity<ApiResponse<List<Member>>> searchMemberForManualEntry(
             @RequestParam Long gymId,
             @RequestParam String query) {
-        // This calls the new search method in MemberRepository via MemberService
+        log.info("Searching members for gymId={} with query={}", gymId, query);
         return ResponseEntity.ok(ApiResponse.success(memberService.searchMembers(gymId, query), "Members found"));
     }
 
-    // 3. LIVE FEED: The main table data
     @GetMapping("/live/{gymId}")
     public ResponseEntity<ApiResponse<List<Attendance>>> getLiveFeed(@PathVariable Long gymId) {
+        log.info("Fetching live feed for gymId={}", gymId);
         return ResponseEntity.ok(ApiResponse.success(attendanceService.getRecentAttendance(gymId), "Live feed fetched"));
     }
 
-    // 4. STATS: For the "Currently Inside" Summary Card
     @GetMapping("/stats/{gymId}")
     public ResponseEntity<ApiResponse<Long>> getActiveStats(@PathVariable Long gymId) {
+        log.info("Fetching active stats for gymId={}", gymId);
         return ResponseEntity.ok(ApiResponse.success(attendanceService.getActiveCount(gymId), "Active count fetched"));
     }
 
-
     @GetMapping("/member/{memberId}")
-    public ResponseEntity<List<Attendance>> getMemberAttendance(@PathVariable Long memberId) {
-        List<Attendance> logs = attendanceService.findByMemberIdOrderByCheckInTimeDesc(memberId);
-        return ResponseEntity.ok(logs);
+    public ResponseEntity<ApiResponse<List<Attendance>>> getMemberAttendance(@PathVariable Long memberId) {
+        log.info("Fetching attendance logs for memberId={}", memberId);
+        return ResponseEntity.ok(ApiResponse.success(attendanceService.findByMemberIdOrderByCheckInTimeDesc(memberId), "Attendance logs fetched"));
     }
 }

@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
  * Represents a Gym Member entity with personal details,
  * subscription information, and links to Gym and Plan.
  */
+
 @Entity
 @Table(name = "members")
 @Getter

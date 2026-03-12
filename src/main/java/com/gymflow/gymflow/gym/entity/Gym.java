@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 /**
  * Represents a Gym entity with details like name, address, and contact info.
  */
+
 @Entity
 @Table(name = "gyms")
 @Getter
