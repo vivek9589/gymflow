@@ -1,19 +1,26 @@
 package com.gymflow.gymflow.member.entity;
 
-
 import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.plan.entity.Plan;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-
+/**
+ * Represents a Gym Member entity with personal details,
+ * subscription information, and links to Gym and Plan.
+ */
 @Entity
 @Table(name = "members")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Member {
 
     @Id
@@ -21,44 +28,50 @@ public class Member {
     private Long id;
 
     @Column(nullable = false)
-    private String name; // [cite: 5]
+    private String name;
 
     @Column(nullable = false)
-    private String phone; // [cite: 13]
+    private String phone;
 
-    private String email; // [cite: 15]
-    private String bloodGroup; // [cite: 18]
-    private Double weight; // [cite: 22]
-    private Double height; // [cite: 21]
+    private String email;
+    private String bloodGroup;
+    private Double weight;
+    private Double height;
 
-    // New fields from the Admission Form
-    private LocalDate dob; // [cite: 7]
-    private String occupation; // [cite: 9]
-    private String fatherName; // [cite: 11]
-    private String permanentAddress; // [cite: 17]
+    private LocalDate dob;
+    private String occupation;
+    private String fatherName;
+    private String permanentAddress;
 
     @Column(columnDefinition = "TEXT")
-    private String medicalConditions; // [cite: 29]
+    private String medicalConditions;
 
-    private Double initialPayment; // [cite: 26]
+    private Double initialPayment;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gym_id", nullable = false)
     private Gym gym;
 
-    private LocalDate registrationDate = LocalDate.now();
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDate registrationDate;
 
     @Column(nullable = false)
-    private String status = "PENDING"; // Changed default to PENDING for QR joins
+    private String status = "PENDING"; // Default status
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id")
-    private Plan currentPlan; // [cite: 24]
+    private Plan currentPlan;
 
     private LocalDate subscriptionStartDate;
     private LocalDate expiryDate;
 
     private boolean whatsappEnabled = true;
 
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
 }

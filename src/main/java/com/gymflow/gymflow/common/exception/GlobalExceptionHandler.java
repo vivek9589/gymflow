@@ -13,13 +13,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * Global exception handler for the application.
  * Maps custom exceptions to proper HTTP status codes and ensures consistent API responses.
  */
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
-     * Handle unexpected exceptions.
+     * Handle unexpected exceptions (fallback).
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<String>> handleAllExceptions(Exception ex) {
@@ -81,17 +82,29 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(errorMessage));
     }
 
-
+    /**
+     * Handle resource not found scenarios.
+     */
     @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<String> handleNotFound(ResourceNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    public ResponseEntity<ApiResponse<String>> handleNotFound(ResourceNotFoundException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
     }
 
+    /**
+     * Handle notification send failures.
+     */
     @ExceptionHandler(NotificationSendException.class)
-    public ResponseEntity<String> handleSendFailure(NotificationSendException ex) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ex.getMessage());
+    public ResponseEntity<ApiResponse<String>> handleSendFailure(NotificationSendException ex) {
+        log.error("Notification send failed: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ex.getMessage()));
     }
 
+    /**
+     * Handle gym not found scenarios.
+     */
     @ExceptionHandler(GymNotFoundException.class)
     public ResponseEntity<ApiResponse<String>> handleGymNotFound(GymNotFoundException ex) {
         log.warn("Gym not found: {}", ex.getMessage());
@@ -99,4 +112,13 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    /**
+     * Handle member not found scenarios.
+     */
+    @ExceptionHandler(MemberNotFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handleMemberNotFound(MemberNotFoundException ex) {
+        log.warn("Member not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
 }
