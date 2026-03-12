@@ -153,5 +153,20 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    // -------------------- PLAN Exceptions --------------------
+    @ExceptionHandler(PlanNotFoundException.class)
+    public ResponseEntity<ApiResponse<String>> handlePlanNotFound(PlanNotFoundException ex) {
+        log.warn("Plan not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(PlanAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<String>> handlePlanAlreadyExists(PlanAlreadyExistsException ex) {
+        log.warn("Plan conflict: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
 
 }
