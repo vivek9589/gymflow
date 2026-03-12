@@ -22,6 +22,12 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     List<Attendance> findByGymIdAndCheckInTimeBetweenOrderByCheckInTimeDesc(
             Long gymId, LocalDateTime start, LocalDateTime end);
 
+    // Count all attendance records for a gym
+    long countByGymId(Long gymId);
+
+    // Count active sessions (check-out time is null)
+    long countByGymIdAndCheckOutTimeIsNull(Long gymId);
+
 
 
 
