@@ -1,6 +1,7 @@
 package com.gymflow.gymflow.attendance.controller;
 
 
+import com.gymflow.gymflow.attendance.dto.response.AttendanceLiveDTO;
 import com.gymflow.gymflow.attendance.entity.Attendance;
 import com.gymflow.gymflow.attendance.service.AttendanceService;
 import com.gymflow.gymflow.common.dto.ApiResponse;
@@ -43,7 +44,7 @@ public class AttendanceController {
     }
 
     @GetMapping("/live/{gymId}")
-    public ResponseEntity<ApiResponse<List<Attendance>>> getLiveFeed(@PathVariable Long gymId) {
+    public ResponseEntity<ApiResponse<List<AttendanceLiveDTO>>> getLiveFeed(@PathVariable Long gymId) {
         log.info("Fetching live feed for gymId={}", gymId);
         return ResponseEntity.ok(ApiResponse.success(attendanceService.getRecentAttendance(gymId), "Live feed fetched"));
     }

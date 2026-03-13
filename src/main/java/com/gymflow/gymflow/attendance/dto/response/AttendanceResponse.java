@@ -13,6 +13,7 @@ public class AttendanceResponse {
     private Long id;
     private String memberName;
     private String gymName;
+    private Long daysLeft;
     private LocalDateTime checkInTime;
     private LocalDateTime checkOutTime;
 }

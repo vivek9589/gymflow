@@ -9,6 +9,7 @@ import com.gymflow.gymflow.member.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -50,9 +51,19 @@ public class MemberController {
      */
     @GetMapping("/gym/{gymId}")
     @PreAuthorize("hasRole('OWNER')")
-    public ResponseEntity<ApiResponse<List<Member>>> getGymMembers(@PathVariable Long gymId) {
-        log.info("Fetching members for gymId: {}", gymId);
-        return ResponseEntity.ok(ApiResponse.success(memberService.getAllMembersByGym(gymId), "Members fetched"));
+    public ResponseEntity<ApiResponse<Page<Member>>> getGymMembers(
+            @PathVariable Long gymId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String planName) {
+
+        log.info("Request to fetch paged members for gymId: {}", gymId);
+
+        Page<Member> memberPage = memberService.getAllMembersByGym(gymId, page, size, status, search, planName);
+
+        return ResponseEntity.ok(ApiResponse.success(memberPage, "Members fetched successfully"));
     }
 
     /**

@@ -3,6 +3,8 @@ package com.gymflow.gymflow.member.repository;
 
 
 import com.gymflow.gymflow.member.entity.Member;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,5 +35,19 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
             "m.phone LIKE CONCAT('%', :query, '%') OR " +
             "LOWER(m.email) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Member> searchMembersByGym(@Param("gymId") Long gymId, @Param("query") String query);
+
+
+    @Query("SELECT m FROM Member m WHERE m.gym.id = :gymId " +
+            "AND (:status IS NULL OR m.status = :status) " +
+            "AND (:planName IS NULL OR m.currentPlan.name = :planName) " +
+            "AND (:search IS NULL OR LOWER(m.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "OR m.phone LIKE CONCAT('%', :search, '%'))")
+    Page<Member> findWithFilters(
+            @Param("gymId") Long gymId,
+            @Param("status") String status,
+            @Param("search") String search,
+            @Param("planName") String planName,
+            Pageable pageable
+    );
 
 }

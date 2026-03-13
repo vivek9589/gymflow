@@ -5,8 +5,11 @@ import com.gymflow.gymflow.plan.dto.PlanDTO;
 import java.util.List;
 
 public interface PlanService {
+
     PlanDTO createPlan(Long gymId, PlanDTO dto);
-    List<PlanDTO> getPlansByGym(Long gymId);
+
+    List<PlanDTO> getPlansByGymId(Long gymId);
+    PlanDTO updatePlanStatus(Long planId, boolean status);
     PlanDTO getPlanById(Long planId);
     PlanDTO updatePlan(Long planId, PlanDTO dto);
     void deletePlan(Long planId);

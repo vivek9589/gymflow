@@ -4,6 +4,7 @@ import com.gymflow.gymflow.gym.entity.Gym;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
@@ -12,6 +13,8 @@ import java.time.LocalDateTime;
 /**
  * Represents a subscription plan offered by a gym.
  */
+
+
 @Entity
 @Table(name = "plans")
 @Getter
@@ -41,6 +44,9 @@ public class Plan {
     private Gym gym;
 
     private boolean isActive = true; // Soft delete flag
+
+    @Formula("(SELECT COUNT(m.id) FROM members m WHERE m.plan_id = id AND m.status = 'ACTIVE')")
+    private Long memberCount;
 
     @CreationTimestamp
     @Column(updatable = false)
