@@ -19,6 +19,10 @@ import com.gymflow.gymflow.plan.entity.Plan;
 import com.gymflow.gymflow.plan.repository.PlanRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -105,10 +109,19 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    public List<Member> getAllMembersByGym(Long gymId) {
-        log.info("Fetching all members for gymId: {}", gymId);
-        return memberRepository.findByGymId(gymId);
+    public Page<Member> getAllMembersByGym(Long gymId, int page, int size, String status, String search, String planName) {
+        log.info("Fetching paged members for gymId: {} [Page: {}, Size: {}]", gymId, page, size);
+
+        // Sort by most recent first
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+
+        // Convert "ALL" to null so the query ignores the filter
+        String statusFilter = "ALL".equalsIgnoreCase(status) ? null : status;
+        String planFilter = "ALL".equalsIgnoreCase(planName) ? null : planName;
+
+        return memberRepository.findWithFilters(gymId, statusFilter, search, planFilter, pageable);
     }
+
 
     @Override
     @Transactional

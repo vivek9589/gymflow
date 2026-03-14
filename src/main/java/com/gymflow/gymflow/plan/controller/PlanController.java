@@ -11,6 +11,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+
 /**
  * REST controller for managing subscription plans.
  * Owners can create, update, delete plans.
@@ -42,9 +44,24 @@ public class PlanController {
      * Accessible to members and owners.
      */
     @GetMapping("/gym/{gymId}")
-    public ResponseEntity<ApiResponse<List<PlanDTO>>> getGymPlans(@PathVariable Long gymId) {
-        log.info("API call: Fetch active plans for gymId={}", gymId);
-        return ResponseEntity.ok(ApiResponse.success(planService.getPlansByGym(gymId), "Plans fetched"));
+    public ResponseEntity<ApiResponse<List<PlanDTO>>> getPlans(@PathVariable Long gymId) {
+        List<PlanDTO> plans = planService.getPlansByGymId(gymId);
+        return ResponseEntity.ok(ApiResponse.success(plans, "Plans retrieved successfully"));
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<PlanDTO>> updateStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, Boolean> statusUpdate) {
+
+        Boolean isActive = statusUpdate.get("active");
+        if (isActive == null) {
+            log.warn("Status update requested for ID: {} without 'active' field", id);
+            return ResponseEntity.badRequest().body(ApiResponse.error("Field 'active' is required"));
+        }
+
+        PlanDTO updatedPlan = planService.updatePlanStatus(id, isActive);
+        return ResponseEntity.ok(ApiResponse.success(updatedPlan, "Plan status updated successfully"));
     }
 
     /**

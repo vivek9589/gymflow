@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
  * REST Controller for authentication-related APIs.
  * Provides endpoints for login, registration, logout, profile management, and password operations.
  */
+
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor

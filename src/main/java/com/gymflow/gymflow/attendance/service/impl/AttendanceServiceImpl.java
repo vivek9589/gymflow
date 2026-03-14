@@ -1,5 +1,6 @@
 package com.gymflow.gymflow.attendance.service.impl;
 
+import com.gymflow.gymflow.attendance.dto.response.AttendanceLiveDTO;
 import com.gymflow.gymflow.attendance.entity.Attendance;
 import com.gymflow.gymflow.attendance.repository.AttendanceRepository;
 import com.gymflow.gymflow.attendance.service.AttendanceService;
@@ -13,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -83,9 +85,26 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
 
     @Override
-    public List<Attendance> getRecentAttendance(Long gymId) {
-        log.info("Fetching recent attendance for gymId={}", gymId);
-        return attendanceRepository.findByGymIdOrderByCheckInTimeDesc(gymId);
+    public List<AttendanceLiveDTO> getRecentAttendance(Long gymId) {
+        log.debug("Fetching recent attendance feed for gymId={}", gymId);
+
+        List<Object[]> rows = attendanceRepository.findLiveTrackerData(gymId);
+
+        List<AttendanceLiveDTO> attendanceList = rows.stream()
+                .map(r -> new AttendanceLiveDTO(
+                        ((Number) r[0]).longValue(),   // id
+                        ((Number) r[1]).longValue(),   // memberId
+                        (String) r[2],                 // memberName
+                        (r[3] != null ? ((Timestamp) r[3]).toLocalDateTime() : null), // checkInTime
+                        (r[4] != null ? ((Timestamp) r[4]).toLocalDateTime() : null), // checkOutTime
+                        r[5],                          // daysLeft (Object, handled in DTO constructor)
+                        (String) r[6],                 // status
+                        ((Number) r[7]).intValue()     // streak
+                ))
+                .toList();
+
+        log.info("Fetched {} attendance records for gymId={}", attendanceList.size(), gymId);
+        return attendanceList;
     }
 
     @Override

@@ -3,6 +3,7 @@ package com.gymflow.gymflow.plan.service.impl;
 import com.gymflow.gymflow.common.exception.GymNotFoundException;
 import com.gymflow.gymflow.common.exception.PlanAlreadyExistsException;
 import com.gymflow.gymflow.common.exception.PlanNotFoundException;
+import com.gymflow.gymflow.common.exception.ResourceNotFoundException;
 import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
 import com.gymflow.gymflow.plan.dto.PlanDTO;
@@ -11,10 +12,12 @@ import com.gymflow.gymflow.plan.repository.PlanRepository;
 import com.gymflow.gymflow.plan.service.PlanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +26,7 @@ public class PlanServiceImpl implements PlanService {
 
     private final PlanRepository planRepository;
     private final GymRepository gymRepository;
+    private final ModelMapper modelMapper;
 
     @Override
     @Transactional
@@ -54,10 +58,27 @@ public class PlanServiceImpl implements PlanService {
     }
 
     @Override
-    public List<PlanDTO> getPlansByGym(Long gymId) {
-        log.info("Fetching active plans for gymId={}", gymId);
-        return planRepository.findByGymIdAndIsActiveTrue(gymId)
-                .stream().map(this::mapToDTO).toList();
+    @Transactional
+    public PlanDTO updatePlanStatus(Long planId, boolean status) {
+        log.info("Updating status for plan ID: {} to {}", planId, status);
+
+        Plan plan = planRepository.findById(planId)
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found with id: " + planId));
+
+        plan.setActive(status);
+        Plan updatedPlan = planRepository.save(plan);
+
+        log.info("Plan status updated successfully for ID: {}", planId);
+        return modelMapper.map(updatedPlan, PlanDTO.class);
+    }
+
+    @Override
+    public List<PlanDTO> getPlansByGymId(Long gymId) {
+        log.debug("Fetching all plans for gym ID: {}", gymId);
+        return planRepository.findByGymId(gymId)
+                .stream()
+                .map(plan -> modelMapper.map(plan, PlanDTO.class))
+                .collect(Collectors.toList());
     }
 
     @Override

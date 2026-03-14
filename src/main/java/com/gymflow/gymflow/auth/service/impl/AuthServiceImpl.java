@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Implementation of AuthService.
  * Handles login, registration, and extended authentication flows for Gym Owners.
  */
+
+
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -164,15 +166,21 @@ public class AuthServiceImpl implements AuthService {
         GymOwner owner = authRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException(email));
 
+        // Update Owner field
         owner.setOwnerName(request.getOwnerName());
-        owner.getGym().setContactNumber(request.getContactNumber());
-        owner.getGym().setCity(request.getCity());
-        owner.getGym().setState(request.getState());
-        owner.getGym().setPincode(request.getPincode());
-        owner.getGym().setWebsite(request.getWebsite());
-        owner.getGym().setDescription(request.getDescription());
-        owner.getGym().setLogoUrl(request.getLogoUrl());
 
+        // Update nested Gym fields
+        Gym gym = owner.getGym();
+        gym.setContactNumber(request.getContactNumber());
+        gym.setCity(request.getCity());
+        gym.setState(request.getState());
+        gym.setPincode(request.getPincode());
+        gym.setWebsite(request.getWebsite());
+        gym.setDescription(request.getDescription());
+        gym.setLogoUrl(request.getLogoUrl());
+
+        // authRepository.save(owner) is handled by @Transactional automatically,
+        // but keeping it is fine.
         authRepository.save(owner);
     }
 
