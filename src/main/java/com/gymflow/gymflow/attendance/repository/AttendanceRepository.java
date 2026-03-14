@@ -48,6 +48,15 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
     List<Object[]> findLiveTrackerData(@Param("gymId") Long gymId);
 
 
+    // Count distinct active members who checked in during the last 7 days
+    @Query("SELECT COUNT(DISTINCT a.member.id) " +
+            "FROM Attendance a " +
+            "WHERE a.gym.id = :gymId AND a.checkInTime >= :startDate")
+    int countActiveMembersThisWeek(@Param("gymId") Long gymId,
+                                   @Param("startDate") LocalDateTime startDate);
+
+
+
 
 
 }
