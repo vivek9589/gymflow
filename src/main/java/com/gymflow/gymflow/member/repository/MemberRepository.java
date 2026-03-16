@@ -14,38 +14,51 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-
+import java.util.Optional;
 
 @Repository
 public interface MemberRepository extends JpaRepository<Member, Long> {
 
-    // Basic finders
-    List<Member> findByGymId(Long gymId);
-    List<Member> findByGymIdAndStatus(Long gymId, String status);
+    // --- Basic Finders (Filtered) ---
 
-    long countByGymId(Long gymId);
-    long countByGymIdAndStatus(Long gymId, String status);
+    // Updated from findByGymId
+    List<Member> findByGymIdAndDeletedFalse(Long gymId);
 
-    List<Member> findTop5ByGymIdOrderByCreatedAtDesc(Long gymId);
+    // Updated counts to exclude deleted members
+    long countByGymIdAndDeletedFalse(Long gymId);
 
-    List<Member> findByExpiryDate(LocalDate expiryDate);
-    List<Member> findByGymIdAndExpiryDateBetween(Long gymId, LocalDate start, LocalDate end);
+    long countByGymIdAndStatusAndDeletedFalse(Long gymId, String status);
 
-    // Monthly revenue calculation
+    // Dashboard Recent Members (Filtered)
+    List<Member> findTop5ByGymIdAndDeletedFalseOrderByCreatedAtDesc(Long gymId);
+
+
+    // --- Subscription & Expiry (Filtered) ---
+
+    List<Member> findByExpiryDateAndDeletedFalse(LocalDate expiryDate);
+
+    List<Member> findByGymIdAndExpiryDateBetweenAndDeletedFalse(Long gymId, LocalDate start, LocalDate end);
+
+
+    // --- Revenue Calculation ---
+    // NOTE: We usually keep deleted members in revenue calculations
+    // because money already paid still contributes to financial history.
     @Query("SELECT COALESCE(SUM(m.initialPayment), 0) " +
             "FROM Member m " +
             "WHERE m.gym.id = :gymId AND FUNCTION('MONTH', m.registrationDate) = :month")
     BigDecimal calculateMonthlyRevenue(@Param("gymId") Long gymId, @Param("month") int month);
 
-    // Search members by name, phone, or email
-    @Query("SELECT m FROM Member m WHERE m.gym.id = :gymId AND (" +
+
+    // --- Search & Filters (Filtered) ---
+
+    @Query("SELECT m FROM Member m WHERE m.gym.id = :gymId AND m.deleted = false AND (" +
             "LOWER(m.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
             "m.phone LIKE CONCAT('%', :query, '%') OR " +
             "LOWER(m.email) LIKE LOWER(CONCAT('%', :query, '%')))")
     List<Member> searchMembersByGym(@Param("gymId") Long gymId, @Param("query") String query);
 
-    // Filter with optional parameters
     @Query("SELECT m FROM Member m WHERE m.gym.id = :gymId " +
+            "AND m.deleted = false " +
             "AND (:status IS NULL OR m.status = :status) " +
             "AND (:planName IS NULL OR m.currentPlan.name = :planName) " +
             "AND (:search IS NULL OR LOWER(m.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
@@ -58,11 +71,20 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
             Pageable pageable
     );
 
+
+    // --- Analytics (Filtered) ---
+
     @Query("SELECT new com.gymflow.gymflow.dashboard.dto.PopularPlanDTO(p.name, COUNT(m)) " +
             "FROM Member m JOIN m.currentPlan p " +
-            "WHERE m.gym.id = :gymId " +
+            "WHERE m.gym.id = :gymId AND m.deleted = false " +
             "GROUP BY p.name " +
             "ORDER BY COUNT(m) DESC")
     Page<PopularPlanDTO> findPopularPlans(@Param("gymId") Long gymId, Pageable pageable);
 
+
+    // --- Utility Finders ---
+
+    List<Member> findAllByDeletedFalse();
+
+    Optional<Member> findByIdAndDeletedFalse(Long id);
 }

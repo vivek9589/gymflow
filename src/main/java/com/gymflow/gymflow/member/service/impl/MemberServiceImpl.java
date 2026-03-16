@@ -48,13 +48,16 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public Member registerMember(MemberJoinRequest request) {
-        log.info("Registering new member for gymCode: {}", request.getGymCode());
+        log.info("Registering new member for gym Id: {}", request.getGymId());
 
-        Gym gym = gymRepository.findByGymCode(request.getGymCode())
-                .orElseThrow(() -> new GymNotFoundException("Invalid Gym Code: " + request.getGymCode()));
+        Gym gym = gymRepository.findById(request.getGymId())
+                .orElseThrow(() -> new GymNotFoundException("Invalid Gym ID: " + request.getGymId()));
 
         Plan plan = planRepository.findById(request.getPlanId())
                 .orElseThrow(() -> new PlanNotFoundException("Selected plan not found"));
+
+        // Use the provided startDate or default to today
+        LocalDate start = (request.getStartDate() != null) ? request.getStartDate() : LocalDate.now();
 
         Member member = Member.builder()
                 .name(request.getName())
@@ -73,7 +76,7 @@ public class MemberServiceImpl implements MemberService {
                 .currentPlan(plan)
                 .subscriptionStartDate(LocalDate.now())
                 .expiryDate(LocalDate.now().plusDays(plan.getDurationInDays()))
-                .status("PENDING")
+                .status(request.isPaid() ? "ACTIVE" : "PENDING") // Map 'paid' to status
                 .build();
 
         Member savedMember = memberRepository.save(member);
@@ -126,12 +129,19 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public void deleteMember(Long memberId) {
-        log.info("Deleting member with id: {}", memberId);
-        if (!memberRepository.existsById(memberId)) {
-            throw new MemberNotFoundException("Member not found with id: " + memberId);
-        }
-        memberRepository.deleteById(memberId);
+        log.info("Soft-deleting member with id: {}", memberId);
+
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new MemberNotFoundException("Member not found with id: " + memberId));
+
+        // Manual Soft Delete
+        member.setDeleted(true);
+
+        // Just saving is enough; the record stays in DB but your
+        // findWithFilters query will now ignore it.
+        memberRepository.save(member);
     }
+
 
     @Override
     @Transactional

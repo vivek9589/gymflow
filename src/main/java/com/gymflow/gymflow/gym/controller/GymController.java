@@ -22,11 +22,11 @@ public class GymController {
     private final GymService gymService;
 
     // Public endpoint for members to see gym details before joining
-    @GetMapping("/public/{code}")
-    public ResponseEntity<ApiResponse<GymResponse>> getPublicGymDetails(@PathVariable String code) {
-        log.info("Public request for gym details by code: {}", code);
-        return ResponseEntity.ok(ApiResponse.success(gymService.getGymByCode(code), "Gym details fetched"));
-    }
+//    @GetMapping("/public/{code}")
+//    public ResponseEntity<ApiResponse<GymResponse>> getPublicGymDetails(@PathVariable String code) {
+//        log.info("Public request for gym details by code: {}", code);
+//        return ResponseEntity.ok(ApiResponse.success(gymService.getGymByCode(code), "Gym details fetched"));
+//    }
 
     // Protected: Only the Owner can update their gym
     @PutMapping("/{id}")

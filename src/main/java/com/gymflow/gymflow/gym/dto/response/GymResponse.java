@@ -8,7 +8,7 @@ import lombok.Data;
 public class GymResponse {
     private Long id;
     private String name;
-    private String gymCode;
+    // private String gymCode;
     private String address;
     private String contactNumber;
 }

@@ -4,6 +4,7 @@ import com.gymflow.gymflow.auth.dto.request.LoginRequest;
 import com.gymflow.gymflow.auth.dto.request.OwnerRegisterRequest;
 import com.gymflow.gymflow.auth.dto.request.UpdateProfileRequest;
 import com.gymflow.gymflow.auth.dto.response.LoginResponse;
+import com.gymflow.gymflow.auth.dto.response.ProfileResponseDTO;
 import com.gymflow.gymflow.auth.entity.GymOwner;
 import com.gymflow.gymflow.auth.enums.Role;
 import com.gymflow.gymflow.auth.repository.GymOwnerRepository;
@@ -12,6 +13,7 @@ import com.gymflow.gymflow.auth.service.AuthService;
 import com.gymflow.gymflow.common.exception.InvalidCredentialsException;
 import com.gymflow.gymflow.common.exception.UserAlreadyExistsException;
 import com.gymflow.gymflow.common.exception.UserNotFoundException;
+import com.gymflow.gymflow.gym.dto.response.GymResponseDTO;
 import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
 import lombok.RequiredArgsConstructor;
@@ -103,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
                 .establishedYear(request.getEstablishedYear())
                 .description(request.getDescription())
                 .logoUrl(request.getLogoUrl())
-                .gymCode(java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase())
+                //.gymCode(java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase())
                 .build();
 
         Gym savedGym = gymRepository.save(gym);
@@ -154,10 +156,32 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public GymOwner getProfile(String email) {
-        log.info("Fetching profile for email={}", email);
-        return authRepository.findByEmail(email)
+    public ProfileResponseDTO getProfile(String email) {
+        GymOwner owner = authRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException(email));
+
+        return ProfileResponseDTO.builder()
+                .id(owner.getId())
+                .ownerName(owner.getOwnerName())
+                .email(owner.getEmail())
+                .role(owner.getRole().name())
+                .createdAt(owner.getCreatedAt())
+                .updatedAt(owner.getUpdatedAt())
+                .gym(GymResponseDTO.builder()
+                        .id(owner.getGym().getId())
+                        .name(owner.getGym().getName())
+                        //.gymCode(owner.getGym().getGymCode())
+                        .address(owner.getGym().getAddress())
+                        .contactNumber(owner.getGym().getContactNumber())
+                        .city(owner.getGym().getCity())
+                        .state(owner.getGym().getState())
+                        .pincode(owner.getGym().getPincode())
+                        .website(owner.getGym().getWebsite())
+                        .logoUrl(owner.getGym().getLogoUrl())
+                        .description(owner.getGym().getDescription())
+                        .establishedYear(owner.getGym().getEstablishedYear())
+                        .build())
+                .build();
     }
 
     @Override

@@ -27,8 +27,8 @@ public class Gym {
     @Column(nullable = false)
     private String name;
 
-    @Column(unique = true, nullable = false)
-    private String gymCode;
+//    @Column(unique = true, nullable = false)
+//    private String gymCode;
 
     private String address;
     private String contactNumber;

@@ -58,7 +58,7 @@ public class Member {
     private LocalDate registrationDate;
 
     @Column(nullable = false)
-    private String status = "PENDING"; // Default status
+    private String status ;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id")
@@ -66,6 +66,10 @@ public class Member {
 
     private LocalDate subscriptionStartDate;
     private LocalDate expiryDate;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean deleted = false;
 
     private boolean whatsappEnabled = true;
 

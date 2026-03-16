@@ -10,7 +10,7 @@ public class GymDTO {
     @NotBlank(message = "Gym name is required")
     private String name;
 
-    private String gymCode; // Read-only for the owner usually
+    // private String gymCode; // Read-only for the owner usually
 
     @NotBlank(message = "Address is required")
     private String address;

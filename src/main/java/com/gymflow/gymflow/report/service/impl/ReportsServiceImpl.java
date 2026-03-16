@@ -24,7 +24,6 @@ import java.time.Month;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -34,33 +33,46 @@ public class ReportsServiceImpl implements ReportsService {
     private final MemberRepository memberRepository;
     private final AttendanceRepository attendanceRepository;
 
-    // --- DASHBOARD DTO METHODS (Original) ---
+    // --- DASHBOARD DTO METHODS ---
 
     @Override
     public RevenueReportDTO getRevenueReport(Long gymId, int year) {
+        // Financial history includes everyone (deleted or not) for accounting accuracy
         Map<String, BigDecimal> monthlyRevenue = fetchMonthlyRevenueData(gymId, year);
-        BigDecimal totalRevenue = monthlyRevenue.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        return RevenueReportDTO.builder().totalRevenue(totalRevenue).monthlyRevenue(monthlyRevenue).build();
+        BigDecimal totalRevenue = monthlyRevenue.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return RevenueReportDTO.builder()
+                .totalRevenue(totalRevenue)
+                .monthlyRevenue(monthlyRevenue)
+                .build();
     }
 
     @Override
     public MemberReportDTO getMemberReport(Long gymId) {
+        // Only count members where deleted = false
         return MemberReportDTO.builder()
-                .totalMembers(memberRepository.countByGymId(gymId))
-                .activeMembers(memberRepository.countByGymIdAndStatus(gymId, "ACTIVE"))
-                .expiredMembers(memberRepository.countByGymIdAndStatus(gymId, "EXPIRED"))
-                .pendingMembers(memberRepository.countByGymIdAndStatus(gymId, "PENDING"))
+                .totalMembers(memberRepository.countByGymIdAndDeletedFalse(gymId))
+                .activeMembers(memberRepository.countByGymIdAndStatusAndDeletedFalse(gymId, "ACTIVE"))
+                .expiredMembers(memberRepository.countByGymIdAndStatusAndDeletedFalse(gymId, "EXPIRED"))
+                .pendingMembers(memberRepository.countByGymIdAndStatusAndDeletedFalse(gymId, "PENDING"))
                 .build();
     }
 
     @Override
     public AttendanceReportDTO getAttendanceReport(Long gymId) {
+        // Fetching recent logs (we show logs even if member is now deleted for historical record)
         List<String> recentLogs = attendanceRepository.findByGymIdOrderByCheckInTimeDesc(gymId)
-                .stream().limit(5).map(a -> a.getMember().getName() + " checked in at " + a.getCheckInTime()).toList();
+                .stream()
+                .limit(5)
+                .map(a -> a.getMember().getName() + " checked in at " + a.getCheckInTime())
+                .toList();
+
         return AttendanceReportDTO.builder()
                 .totalSessions(attendanceRepository.countByGymId(gymId))
                 .activeSessions(attendanceRepository.countByGymIdAndCheckOutTimeIsNull(gymId))
-                .recentAttendanceLogs(recentLogs).build();
+                .recentAttendanceLogs(recentLogs)
+                .build();
     }
 
     // --- EXCEL GENERATION METHODS ---
@@ -80,21 +92,25 @@ public class ReportsServiceImpl implements ReportsService {
                 row.createCell(2).setCellValue(log.getCheckOutTime() != null ? log.getCheckOutTime().toString() : "In Gym");
             }
             return finalizeWorkbook(workbook, out);
-        } catch (IOException e) { throw new RuntimeException("Excel generation failed", e); }
+        } catch (IOException e) {
+            log.error("Failed to generate Attendance Excel", e);
+            throw new RuntimeException("Excel generation failed", e);
+        }
     }
 
     @Override
     public byte[] generateMemberExcel(Long gymId) {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Member Summary");
+            Sheet sheet = workbook.createSheet("Active Member Summary");
             createHeader(workbook, sheet, new String[]{"Category", "Count"});
 
+            // getMemberReport now uses the 'AndDeletedFalse' filters
             MemberReportDTO data = getMemberReport(gymId);
             String[][] rows = {
-                    {"Total Members", String.valueOf(data.getTotalMembers())},
-                    {"Active Members", String.valueOf(data.getActiveMembers())},
-                    {"Expired Members", String.valueOf(data.getExpiredMembers())},
-                    {"Pending Members", String.valueOf(data.getPendingMembers())}
+                    {"Total Active Members", String.valueOf(data.getTotalMembers())},
+                    {"Status: ACTIVE", String.valueOf(data.getActiveMembers())},
+                    {"Status: EXPIRED", String.valueOf(data.getExpiredMembers())},
+                    {"Status: PENDING", String.valueOf(data.getPendingMembers())}
             };
 
             for (int i = 0; i < rows.length; i++) {
@@ -103,7 +119,10 @@ public class ReportsServiceImpl implements ReportsService {
                 row.createCell(1).setCellValue(rows[i][1]);
             }
             return finalizeWorkbook(workbook, out);
-        } catch (IOException e) { throw new RuntimeException("Excel generation failed", e); }
+        } catch (IOException e) {
+            log.error("Failed to generate Member Excel", e);
+            throw new RuntimeException("Excel generation failed", e);
+        }
     }
 
     @Override
@@ -122,12 +141,25 @@ public class ReportsServiceImpl implements ReportsService {
 
             // Add Total Row
             Row totalRow = sheet.createRow(rowIdx);
-            totalRow.createCell(0).setCellValue("TOTAL ANNUAL REVENUE");
+            CellStyle boldStyle = workbook.createCellStyle();
+            Font font = workbook.createFont();
+            font.setBold(true);
+            boldStyle.setFont(font);
+
+            Cell labelCell = totalRow.createCell(0);
+            labelCell.setCellValue("TOTAL ANNUAL REVENUE");
+            labelCell.setCellStyle(boldStyle);
+
             BigDecimal total = revenueData.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-            totalRow.createCell(1).setCellValue(total.doubleValue());
+            Cell totalCell = totalRow.createCell(1);
+            totalCell.setCellValue(total.doubleValue());
+            totalCell.setCellStyle(boldStyle);
 
             return finalizeWorkbook(workbook, out);
-        } catch (IOException e) { throw new RuntimeException("Excel generation failed", e); }
+        } catch (IOException e) {
+            log.error("Failed to generate Revenue Excel", e);
+            throw new RuntimeException("Excel generation failed", e);
+        }
     }
 
     // --- HELPER METHODS ---
@@ -135,7 +167,8 @@ public class ReportsServiceImpl implements ReportsService {
     private Map<String, BigDecimal> fetchMonthlyRevenueData(Long gymId, int year) {
         Map<String, BigDecimal> monthlyRevenue = new LinkedHashMap<>();
         for (int month = 1; month <= 12; month++) {
-            BigDecimal revenue = memberRepository.calculateMonthlyRevenue(gymId, month); // Ensure your repo supports year if needed
+            // Money paid by deleted members is still revenue!
+            BigDecimal revenue = memberRepository.calculateMonthlyRevenue(gymId, month);
             monthlyRevenue.put(Month.of(month).name(), revenue != null ? revenue : BigDecimal.ZERO);
         }
         return monthlyRevenue;

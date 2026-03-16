@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface GymService {
     GymResponse getGymById(Long id);
-    GymResponse getGymByCode(String code);
+    //GymResponse getGymByCode(String code);
     GymResponse updateGym(Long id, GymRequest gymRequest);
     List<GymResponse> getAllGyms();
 }

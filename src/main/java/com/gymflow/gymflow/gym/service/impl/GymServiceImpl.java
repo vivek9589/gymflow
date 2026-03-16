@@ -29,13 +29,13 @@ public class GymServiceImpl implements GymService {
         return mapToResponse(gym);
     }
 
-    @Override
-    public GymResponse getGymByCode(String code) {
-        log.info("Fetching gym by code: {}", code);
-        Gym gym = gymRepository.findByGymCode(code)
-                .orElseThrow(() -> new GymNotFoundException("Invalid Gym Code: " + code));
-        return mapToResponse(gym);
-    }
+//    @Override
+//    public GymResponse getGymByCode(String code) {
+//        log.info("Fetching gym by code: {}", code);
+//        Gym gym = gymRepository.findByGymCode(code)
+//                .orElseThrow(() -> new GymNotFoundException("Invalid Gym Code: " + code));
+//        return mapToResponse(gym);
+//    }
 
     @Override
     @Transactional
@@ -61,7 +61,7 @@ public class GymServiceImpl implements GymService {
         GymResponse response = new GymResponse();
         response.setId(gym.getId());
         response.setName(gym.getName());
-        response.setGymCode(gym.getGymCode());
+        // response.setGymCode(gym.getGymCode());
         response.setAddress(gym.getAddress());
         response.setContactNumber(gym.getContactNumber());
         return response;

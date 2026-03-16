@@ -116,8 +116,10 @@ public class PlanServiceImpl implements PlanService {
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new PlanNotFoundException("Plan not found with id: " + planId));
 
-        plan.setActive(false);
-        planRepository.save(plan);
+        // plan.setActive(false);
+        //planRepository.save(plan);
+
+        planRepository.deleteById(planId);
         log.info("Plan '{}' marked inactive", plan.getName());
     }
 

@@ -33,8 +33,9 @@ public class MemberController {
      */
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<MemberResponse>> joinGym(@Valid @RequestBody MemberJoinRequest request) {
-        log.info("New member registration request for gymCode: {}", request.getGymCode());
+        log.info("New member registration request for gym Id: {}", request.getGymId());
         Member member = memberService.registerMember(request);
+
         MemberResponse response = memberService.updateMember(member.getId(),
                 MemberUpdateRequest.builder()
                         .name(member.getName())
@@ -73,11 +74,16 @@ public class MemberController {
     @DeleteMapping("/{memberId}")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<Void>> deleteMember(@PathVariable Long memberId) {
-        log.info("Deleting member with id: {}", memberId);
+        log.info("Request to delete member: {}", memberId);
         memberService.deleteMember(memberId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Member deleted successfully"));
-    }
 
+        return ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                        .success(true)
+                        .message("Member deactivated successfully")
+                        .build()
+        );
+    }
     /**
      * Protected endpoint: Update member details.
      * Accessible only to OWNER role.

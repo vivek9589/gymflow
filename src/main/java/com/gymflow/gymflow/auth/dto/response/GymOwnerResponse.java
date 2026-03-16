@@ -9,5 +9,5 @@ public class GymOwnerResponse {
     private String ownerName;
     private String email;
     private String gymName;
-    private String gymCode;
+    // private String gymCode;
 }

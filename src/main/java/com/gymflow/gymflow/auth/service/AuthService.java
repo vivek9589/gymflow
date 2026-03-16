@@ -4,6 +4,7 @@ import com.gymflow.gymflow.auth.dto.request.LoginRequest;
 import com.gymflow.gymflow.auth.dto.request.OwnerRegisterRequest;
 import com.gymflow.gymflow.auth.dto.request.UpdateProfileRequest;
 import com.gymflow.gymflow.auth.dto.response.LoginResponse;
+import com.gymflow.gymflow.auth.dto.response.ProfileResponseDTO;
 import com.gymflow.gymflow.auth.entity.GymOwner;
 
 /**
@@ -22,7 +23,7 @@ public interface AuthService {
 
     void resetPassword(String token, String newPassword);
 
-    GymOwner getProfile(String email);
+    ProfileResponseDTO getProfile(String email);
 
     void updateProfile(String email, UpdateProfileRequest request);
 

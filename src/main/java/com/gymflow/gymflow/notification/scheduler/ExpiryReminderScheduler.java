@@ -16,7 +16,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -29,21 +28,28 @@ public class ExpiryReminderScheduler {
     @Value("${scheduler.expiry-reminder.cron:0 0 2 * * ?}")
     private String cronExpression;
 
-
     /**
-     * Scheduled job to send expiry reminders to members whose subscriptions
+     * Scheduled job to send expiry reminders to active members whose subscriptions
      * expire in 3 days. Runs daily at 2 AM by default.
      */
     @Scheduled(cron = "${scheduler.expiry-reminder.cron}")
     public void sendExpiryReminders() {
         log.info("Starting expiry reminder scheduler at {}", LocalDateTime.now());
 
+        // We only want to notify members expiring in 3 days
         LocalDate targetDate = LocalDate.now().plusDays(3);
-        List<Member> members = memberRepository.findByExpiryDate(targetDate);
+
+        // CRITICAL: Updated to use the method that ignores soft-deleted members
+        List<Member> members = memberRepository.findByExpiryDateAndDeletedFalse(targetDate);
+
+        if (members.isEmpty()) {
+            log.info("No members expiring on {}. Job finished.", targetDate);
+            return;
+        }
 
         Optional<NotificationTemplate> templateOpt = templateRepository.findByName("EXPIRY_REMINDER");
         if (templateOpt.isEmpty()) {
-            log.warn("Expiry reminder template not found. Skipping job.");
+            log.warn("Expiry reminder template 'EXPIRY_REMINDER' not found. Skipping job.");
             return;
         }
 
@@ -52,13 +58,19 @@ public class ExpiryReminderScheduler {
         int failureCount = 0;
 
         for (Member member : members) {
+            // Safety check: Don't send if WhatsApp is disabled for this specific member
+            if (!member.isWhatsappEnabled()) {
+                log.info("Skipping notification for {} - WhatsApp disabled", member.getName());
+                continue;
+            }
+
             try {
                 notificationService.sendNotification(member.getId(), template.getId());
                 log.info("Created expiry reminder event for {} ({})", member.getName(), member.getPhone());
                 successCount++;
             } catch (Exception e) {
                 log.error("Failed to create reminder for {} ({}): {}",
-                        member.getName(), member.getPhone(), e.getMessage(), e);
+                        member.getName(), member.getPhone(), e.getMessage());
                 failureCount++;
             }
         }

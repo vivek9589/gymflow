@@ -2,6 +2,7 @@ package com.gymflow.gymflow.auth.controller;
 
 import com.gymflow.gymflow.auth.dto.request.*;
 import com.gymflow.gymflow.auth.dto.response.LoginResponse;
+import com.gymflow.gymflow.auth.dto.response.ProfileResponseDTO;
 import com.gymflow.gymflow.auth.entity.GymOwner;
 import com.gymflow.gymflow.auth.service.AuthService;
 import com.gymflow.gymflow.common.dto.ApiResponse;
@@ -67,9 +68,9 @@ public class AuthController {
     }
 
     @GetMapping("/profile")
-    public ResponseEntity<ApiResponse<GymOwner>> getProfile(Authentication authentication) {
+    public ResponseEntity<ApiResponse<ProfileResponseDTO>> getProfile(Authentication authentication) {
         String email = authentication.getName();
-        GymOwner profile = authService.getProfile(email);
+        ProfileResponseDTO profile = authService.getProfile(email);
         log.info("Profile fetched successfully for email={}", email);
         return ResponseEntity.ok(ApiResponse.success(profile, "Profile fetched successfully."));
     }
