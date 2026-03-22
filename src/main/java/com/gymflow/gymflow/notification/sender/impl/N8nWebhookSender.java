@@ -17,7 +17,7 @@ import java.util.Map;
 
 @Slf4j
 @Component
-@Primary
+//@Primary
 public class N8nWebhookSender implements NotificationSender {
 
     private final RestTemplate restTemplate;

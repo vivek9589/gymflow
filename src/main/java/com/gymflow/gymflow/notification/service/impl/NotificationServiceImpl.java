@@ -4,9 +4,11 @@ import com.gymflow.gymflow.common.exception.NotificationSendException;
 import com.gymflow.gymflow.common.exception.ResourceNotFoundException;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
+import com.gymflow.gymflow.notification.entity.MessageLog;
 import com.gymflow.gymflow.notification.entity.NotificationEvent;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.enums.NotificationStatus;
+import com.gymflow.gymflow.notification.repository.MessageLogRepository;
 import com.gymflow.gymflow.notification.repository.NotificationEventRepository;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
 import com.gymflow.gymflow.notification.sender.NotificationSender;
@@ -29,6 +31,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final MemberRepository memberRepository;
     private final NotificationTemplateRepository templateRepository;
     private final NotificationSender notificationSender; // Injected the Sender interface
+    private final MessageLogRepository messageLogRepository;
 
     @Override
     @Transactional
@@ -62,7 +65,7 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     private void processDispatch(Member member, NotificationTemplate template) {
-        // 1. Create and Save Audit Log (Pending)
+
         NotificationEvent event = new NotificationEvent();
         event.setMember(member);
         event.setTemplate(template);
@@ -71,22 +74,43 @@ public class NotificationServiceImpl implements NotificationService {
         event.setCreatedAt(LocalDateTime.now());
         event = eventRepository.save(event);
 
+        MessageLog logEntry = MessageLog.builder()
+                .gymId(member.getGym().getId())
+                .memberId(member.getId())
+                .channel(template.getChannel().getType().name())
+                .message(template.getTemplateBody())
+                .status("PENDING")
+                .sentAt(LocalDateTime.now())
+                .build();
+
+        logEntry = messageLogRepository.save(logEntry);
+
         try {
-            // RENDER the message first to replace {{name}}, etc.
+
             String personalizedMessage = TemplateRenderer.render(template, member);
 
-            // Pass the rendered message, NOT the raw body
             notificationSender.send(member.getPhone(), personalizedMessage);
 
             event.setStatus(NotificationStatus.SENT);
             event.setProcessedAt(LocalDateTime.now());
+
+            logEntry.setStatus("SENT");
+
         } catch (NotificationSendException e) {
-            // 4. Mark as Failed
+
             event.setStatus(NotificationStatus.FAILED);
             event.setErrorMessage(e.getMessage());
+
+            logEntry.setStatus("FAILED");
+            logEntry.setResponse(e.getMessage());
+
             throw e;
+
         } finally {
+
             eventRepository.save(event);
+            messageLogRepository.save(logEntry);
+
         }
     }
 }
