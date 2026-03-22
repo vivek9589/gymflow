@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -84,14 +85,29 @@ public class DashboardServiceImpl implements DashboardService {
         // 5. Expiring soon (next 7 days - Excluding Deleted)
         LocalDate today = LocalDate.now();
         LocalDate nextWeek = today.plusDays(7);
-        List<Member> expiringSoonMembers = memberRepository.findByGymIdAndExpiryDateBetweenAndDeletedFalse(gymId, today, nextWeek);
+        List<Member> expiringSoonMembers = memberRepository
+                .findByGymIdAndExpiryDateBetweenAndDeletedFalse(gymId, today, nextWeek);
 
         int expiringCount = expiringSoonMembers.size();
         double potentialRevenue = expiringSoonMembers.stream()
                 .filter(m -> m.getCurrentPlan() != null)
                 .mapToDouble(m -> m.getCurrentPlan().getPrice().doubleValue())
                 .sum();
-        ExpiringSoonDTO expiringSoon = new ExpiringSoonDTO(expiringCount, potentialRevenue);
+
+        List<ExpiringMemberDTO> expiringSoonDTOs = expiringSoonMembers.stream()
+                .map(m -> ExpiringMemberDTO.builder()
+                        .name(m.getName())
+                        .phone(m.getPhone())
+                        .planName(m.getCurrentPlan() != null ? m.getCurrentPlan().getName() : "N/A")
+                        .expiryDate(m.getExpiryDate() != null ? m.getExpiryDate().toString() : "N/A")
+                        .status(m.getStatus())
+                        .daysLeft(m.getExpiryDate() != null ?
+                                ChronoUnit.DAYS.between(LocalDate.now(), m.getExpiryDate()) : 0)
+                        .build())
+                .toList();
+
+        ExpiringSoonDTO expiringSoon = new ExpiringSoonDTO(expiringCount, potentialRevenue, expiringSoonDTOs);
+
 
         // 6. Popular plan (Excluding Deleted)
         PopularPlanDTO popularPlan = memberRepository.findPopularPlans(gymId, PageRequest.of(0, 1))
