@@ -44,48 +44,41 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final GymRepository gymRepository;
 
+
     @Override
+    @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
-        log.info("Login attempt for email={}", request.getEmail());
 
-        try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            request.getEmail(),
-                            request.getPassword()
-                    )
-            );
-        } catch (BadCredentialsException e) {
-            log.warn("Invalid login attempt for email={}", request.getEmail());
-            throw new InvalidCredentialsException();
-        }
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(),
+                        request.getPassword()
+                )
+        );
 
-        GymOwner owner = authRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> {
-                    log.error("User not found for email={}", request.getEmail());
-                    return new UserNotFoundException(request.getEmail());
-                });
+        GymOwner owner = authRepository.findByEmailWithGym(request.getEmail())
+                .orElseThrow(() -> new UserNotFoundException(request.getEmail()));
+
+        Gym gym = owner.getGym();
 
         String token = jwtUtil.generateToken(
                 owner.getEmail(),
-                owner.getGym().getId(),
-                owner.getGym().getName(),
+                gym.getId(),
+                gym.getName(),
                 owner.getOwnerName(),
                 owner.getRole().name()
         );
 
-        log.info("Login successful for email={}, gymId={}", owner.getEmail(), owner.getGym().getId());
-
         return new LoginResponse(
                 token,
                 owner.getEmail(),
-                owner.getGym().getId(),
+                gym.getId(),
                 owner.getRole().name()
         );
     }
 
     @Override
-    @Transactional
+    @Transactional   // (readOnly = true)
     public void register(OwnerRegisterRequest request) {
         log.info("Registration attempt for email={}", request.getEmail());
 
@@ -156,6 +149,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ProfileResponseDTO getProfile(String email) {
         GymOwner owner = authRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException(email));

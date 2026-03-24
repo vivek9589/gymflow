@@ -43,7 +43,7 @@ public class GymOwner {
     @Column(nullable = false)
     private Role role = Role.OWNER;
 
-    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(name = "gym_id", referencedColumnName = "id", nullable = false)
     private Gym gym;
 
