@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+  shared-mysql:
+    image: mysql:8.0
+    container_name: shared-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASS}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  evolution_redis:
+    image: redis:alpine
+    container_name: evolution_redis
+    restart: always
+
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api
+    restart: always
+    ports:
+      - "8085:8080"
+    environment:
+      - SERVER_URL=${EVO_INTERNAL_URL}
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVO_API_KEY}
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=mysql
+      - DATABASE_CONNECTION_URI=mysql://${DB_USER}:${DB_PASSWORD}@shared-mysql:3306/evolution
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://evolution_redis:6379
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+      evolution_redis:
+        condition: service_started
+
+  gymflow-app:
+    image: vivek9589/gymflow:${IMAGE_TAG}
+    container_name: gymflow-app
+    restart: always
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+      evolution_api:
+        condition: service_started
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_URL=${DB_URL}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRATION=${JWT_EXPIRATION}
+      - EVO_INTERNAL_URL=${EVO_INTERNAL_URL}
+      - EVO_API_KEY=${EVO_API_KEY}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+
+volumes:
+  mysql_data:
+  evolution_instances:

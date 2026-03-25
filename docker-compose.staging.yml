@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: gympass
+      MYSQL_DATABASE: gym_saas
+
+  gymflow-app:
+    image: vivek9589/gymflow:staging
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.staging
+    depends_on:
+      - mysql

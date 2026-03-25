@@ -4,9 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -17,15 +17,25 @@ import java.io.IOException;
 
 /**
  * JWT Authentication filter that validates tokens and sets authentication in the SecurityContext.
+ * Uses @Lazy to break circular dependencies with CustomUserDetailsService.
  */
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
+
+    /**
+     * Manual constructor to apply @Lazy to the UserDetailsService.
+     * This prevents Spring from trying to initialize the entire DB/JPA layer
+     * before the Security Filter chain is ready.
+     */
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, @Lazy CustomUserDetailsService userDetailsService) {
+        this.jwtUtil = jwtUtil;
+        this.userDetailsService = userDetailsService;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -38,19 +48,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             String token = header.substring(7);
 
-            if (jwtUtil.validateToken(token)) {
-                String email = jwtUtil.extractEmail(token);
-                var userDetails = userDetailsService.loadUserByUsername(email);
+            try {
+                if (jwtUtil.validateToken(token)) {
+                    String email = jwtUtil.extractEmail(token);
+                    var userDetails = userDetailsService.loadUserByUsername(email);
 
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
+                    var authentication = new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
 
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.info("JWT validated successfully for email={}", email);
-            } else {
-                log.warn("Invalid JWT token received");
+                    log.info("JWT validated successfully for email={}", email);
+                } else {
+                    log.warn("Invalid JWT token received");
+                }
+            } catch (Exception e) {
+                log.error("Could not set user authentication in security context", e);
             }
         }
 
