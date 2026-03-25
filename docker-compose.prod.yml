@@ -1,0 +1,96 @@
+version: "3.9"
+
+services:
+  shared-mysql:
+    image: mysql:8.0
+    container_name: shared-mysql
+    restart: always
+    networks:
+      - gymflow-net
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u${DB_USER} -p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  evolution_redis:
+    image: redis:alpine
+    container_name: evolution_redis
+    restart: always
+    networks:
+      - gymflow-net
+
+  evolution_api:
+    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api
+    restart: always
+    networks:
+      - gymflow-net
+    ports:
+      - "8085:8080"
+    environment:
+      - SERVER_URL=${EVO_INTERNAL_URL}
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVO_API_KEY}
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=mysql
+      - DATABASE_CONNECTION_URI=mysql://${DB_USER}:${DB_PASSWORD}@shared-mysql:3306/evolution_db
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://evolution_redis:6379
+    volumes:
+      - evolution_instances:/evolution/instances
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+
+  gymflow-app:
+    image: vivek9589/gymflow:${IMAGE_TAG}
+    container_name: gymflow-app
+    restart: always
+    networks:
+      - gymflow-net
+    ports:
+      - "${SERVER_PORT}:8080"
+    env_file:
+      - .env
+    depends_on:
+      shared-mysql:
+        condition: service_healthy
+      evolution_api:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: always
+    networks:
+      - gymflow-net
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      gymflow-app:
+        condition: service_healthy
+
+networks:
+  gymflow-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  evolution_instances:
