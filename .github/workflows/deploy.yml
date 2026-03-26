@@ -34,14 +34,28 @@ jobs:
             -t ${{ secrets.DOCKER_USERNAME }}/gymflow:latest \
             --push .
 
-      # 5. SSH into Oracle & Deploy
+      # 5. Deploy to Oracle Server
       - name: Deploy to Oracle Server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
           script: |
-            cd ${{ secrets.APP_DIR }}
-            docker compose pull
-            docker compose up -d
+            # Go to project directory
+            cd /home/ubuntu/gymflow
+
+            # Install docker-compose if not present (ARM compatible)
+            if ! command -v docker-compose &> /dev/null
+            then
+              echo "Installing docker-compose..."
+              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
+              sudo chmod +x /usr/local/bin/docker-compose
+            fi
+
+            # Pull latest images
+            docker-compose pull
+
+            # Restart containers
+            docker-compose up -d --remove-orphans
