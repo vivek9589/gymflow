@@ -86,10 +86,12 @@ public class NotificationServiceImpl implements NotificationService {
         logEntry = messageLogRepository.save(logEntry);
 
         try {
-
             String personalizedMessage = TemplateRenderer.render(template, member);
 
-            notificationSender.send(member.getPhone(), personalizedMessage);
+            // Normalize phone number to E.164 format (+91 for India)
+            String normalizedPhone = normalizePhone(member.getPhone());
+
+            notificationSender.send(normalizedPhone, personalizedMessage);
 
             event.setStatus(NotificationStatus.SENT);
             event.setProcessedAt(LocalDateTime.now());
@@ -97,20 +99,34 @@ public class NotificationServiceImpl implements NotificationService {
             logEntry.setStatus("SENT");
 
         } catch (NotificationSendException e) {
-
             event.setStatus(NotificationStatus.FAILED);
             event.setErrorMessage(e.getMessage());
 
             logEntry.setStatus("FAILED");
             logEntry.setResponse(e.getMessage());
 
+            log.error("Notification send failed for member {}: {}", member.getId(), e.getMessage());
             throw e;
 
         } finally {
-
             eventRepository.save(event);
             messageLogRepository.save(logEntry);
-
         }
+    }
+
+    /**
+     * Utility method to normalize phone numbers into E.164 format.
+     * For India, prepend +91 if not already present.
+     */
+    private String normalizePhone(String rawPhone) {
+        if (rawPhone == null || rawPhone.isBlank()) {
+            throw new NotificationSendException("Phone number is missing");
+        }
+        String trimmed = rawPhone.trim();
+        if (!trimmed.startsWith("+")) {
+            // Default to India country code
+            return "+91" + trimmed;
+        }
+        return trimmed;
     }
 }
