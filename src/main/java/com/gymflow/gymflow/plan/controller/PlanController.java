@@ -95,7 +95,7 @@ public class PlanController {
     public ResponseEntity<ApiResponse<Void>> deletePlan(@PathVariable Long planId) {
         log.info("API call: Delete planId={}", planId);
         planService.deletePlan(planId);
-        return ResponseEntity.ok(ApiResponse.success(null, "Plan deleted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Plan marked inactive successfully"));
     }
 
     /**
