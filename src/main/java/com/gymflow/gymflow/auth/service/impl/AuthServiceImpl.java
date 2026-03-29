@@ -16,6 +16,7 @@ import com.gymflow.gymflow.common.exception.UserNotFoundException;
 import com.gymflow.gymflow.gym.dto.response.GymResponseDTO;
 import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
+import com.gymflow.gymflow.notification.service.EvolutionService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
     private final GymRepository gymRepository;
+    private final EvolutionService evolutionService;
 
 
     @Override
@@ -78,15 +80,16 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional   // (readOnly = true)
+    @Transactional
     public void register(OwnerRegisterRequest request) {
+
         log.info("Registration attempt for email={}", request.getEmail());
 
         if (authRepository.existsByEmail(request.getEmail())) {
-            log.warn("Duplicate registration attempt for email={}", request.getEmail());
             throw new UserAlreadyExistsException(request.getEmail());
         }
 
+        // STEP 1: Create Gym
         Gym gym = Gym.builder()
                 .name(request.getGymName())
                 .address(request.getAddress())
@@ -98,11 +101,31 @@ public class AuthServiceImpl implements AuthService {
                 .establishedYear(request.getEstablishedYear())
                 .description(request.getDescription())
                 .logoUrl(request.getLogoUrl())
-                //.gymCode(java.util.UUID.randomUUID().toString().substring(0, 6).toUpperCase())
+                .whatsappStatus("PENDING")
                 .build();
 
         Gym savedGym = gymRepository.save(gym);
 
+        // STEP 2: Generate instance name (SAFE)
+        String instanceName = generateInstanceName(savedGym);
+
+        // STEP 3: Create WhatsApp Instance (IMPORTANT)
+        try {
+            evolutionService.createInstance(instanceName);
+
+            savedGym.setWhatsappInstance(instanceName);
+            savedGym.setWhatsappStatus("QR_READY");
+
+            gymRepository.save(savedGym);
+
+        } catch (Exception e) {
+            log.error("Failed to create WhatsApp instance: {}", e.getMessage());
+
+            savedGym.setWhatsappStatus("FAILED");
+            gymRepository.save(savedGym);
+        }
+
+        // STEP 4: Create Owner
         GymOwner owner = GymOwner.builder()
                 .ownerName(request.getOwnerName())
                 .email(request.getEmail())
@@ -113,7 +136,20 @@ public class AuthServiceImpl implements AuthService {
 
         authRepository.save(owner);
 
-        log.info("Registration successful for owner email={}, gymId={}", owner.getEmail(), savedGym.getId());
+        // STEP 5: Send Email (optional)
+       //  emailService.sendWelcomeEmail(owner.getEmail(), savedGym.getName());
+
+        log.info("Registration completed: gymId={}, instance={}",
+                savedGym.getId(), savedGym.getWhatsappInstance());
+    }
+
+    private String generateInstanceName(Gym gym) {
+
+        String slug = gym.getName()
+                .toLowerCase()
+                .replaceAll("[^a-z0-9]", "-");
+
+        return "gymflow-" + gym.getId() + "-" + slug;
     }
 
     @Override

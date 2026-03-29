@@ -11,7 +11,10 @@ import java.util.List;
 public interface MemberService {
 
     Member registerMember(MemberJoinRequest request);
-    void renewSubscription(Long memberId, Long planId);
+    void renewSubscription(Long memberId, Long planId,
+                           Double amountPaid,
+                           String paymentMode,
+                           String transactionRef);
     Page<Member> getAllMembersByGym(Long gymId, int page, int size, String status, String search, String planName);
 
     void deleteMember(Long memberId);

@@ -9,6 +9,8 @@ import lombok.Data;
  * Request DTO for registering a Gym Owner and their Gym.
  * Includes both owner details and gym details.
  */
+
+
 @Data
 public class OwnerRegisterRequest {
 

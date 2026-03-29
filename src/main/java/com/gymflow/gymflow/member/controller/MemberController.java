@@ -3,6 +3,7 @@ package com.gymflow.gymflow.member.controller;
 import com.gymflow.gymflow.common.dto.ApiResponse;
 import com.gymflow.gymflow.member.dto.request.MemberJoinRequest;
 import com.gymflow.gymflow.member.dto.request.MemberUpdateRequest;
+import com.gymflow.gymflow.member.dto.request.RenewRequest;
 import com.gymflow.gymflow.member.dto.response.MemberResponse;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.service.MemberService;
@@ -20,6 +21,7 @@ import java.util.List;
  * REST controller for managing gym members.
  * Provides endpoints for registration, updates, deletion, and queries.
  */
+
 @RestController
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
@@ -44,6 +46,27 @@ public class MemberController {
                         .status(member.getStatus())
                         .build());
         return ResponseEntity.ok(ApiResponse.success(response, "Welcome! Registration successful."));
+    }
+
+
+    @PostMapping("/renew")
+    @PreAuthorize("hasRole('OWNER')")
+    public ResponseEntity<ApiResponse<String>> renewMembership(
+            @RequestBody RenewRequest request) {
+
+        log.info("Renew request for memberId={}", request.getMemberId());
+
+        memberService.renewSubscription(
+                request.getMemberId(),
+                request.getPlanId(),
+                request.getAmountPaid(),
+                request.getPaymentMode(),
+                request.getTransactionRef()
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(null, "Membership renewed successfully")
+        );
     }
 
     /**

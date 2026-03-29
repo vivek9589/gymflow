@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 import java.time.LocalDate;
+
 @Data
 public class MemberJoinRequest {
     @NotBlank(message = "Name is required")
@@ -25,6 +26,9 @@ public class MemberJoinRequest {
     private String permanentAddress;
     private String medicalConditions;
     private Double initialPayment;
+
+    private String paymentMode; // CASH, UPI
+    private String transactionRef;
 
     // FIX: Variable name should be gymId (lowercase g) to match standard JSON mapping
     @NotNull(message = "Gym ID is required")

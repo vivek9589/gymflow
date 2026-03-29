@@ -15,6 +15,8 @@ import com.gymflow.gymflow.member.service.MemberService;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
 import com.gymflow.gymflow.notification.service.NotificationService;
+import com.gymflow.gymflow.payment.service.PaymentService;
+import com.gymflow.gymflow.payment.service.SubscriptionService;
 import com.gymflow.gymflow.plan.entity.Plan;
 import com.gymflow.gymflow.plan.repository.PlanRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +37,7 @@ import java.util.List;
  * Implementation of MemberService with business logic
  * for registration, subscription renewal, updates, and search.
  */
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -44,10 +48,13 @@ public class MemberServiceImpl implements MemberService {
     private final PlanRepository planRepository;
     private final NotificationService notificationService;
     private final NotificationTemplateRepository notificationTemplateRepository;
+    private final SubscriptionService subscriptionService;
+    private final PaymentService paymentService;
 
     @Override
     @Transactional
     public Member registerMember(MemberJoinRequest request) {
+
         log.info("Registering new member for gym Id: {}", request.getGymId());
 
         Gym gym = gymRepository.findById(request.getGymId())
@@ -56,9 +63,9 @@ public class MemberServiceImpl implements MemberService {
         Plan plan = planRepository.findById(request.getPlanId())
                 .orElseThrow(() -> new PlanNotFoundException("Selected plan not found"));
 
-        // Use the provided startDate or default to today
         LocalDate start = (request.getStartDate() != null) ? request.getStartDate() : LocalDate.now();
 
+        // STEP 1: Create Member (NO PAYMENT LOGIC HERE)
         Member member = Member.builder()
                 .name(request.getName())
                 .phone(request.getPhone())
@@ -71,45 +78,107 @@ public class MemberServiceImpl implements MemberService {
                 .fatherName(request.getFatherName())
                 .permanentAddress(request.getPermanentAddress())
                 .medicalConditions(request.getMedicalConditions())
-                .initialPayment(request.getInitialPayment())
                 .gym(gym)
-                .currentPlan(plan)
-                .subscriptionStartDate(LocalDate.now())
-                .expiryDate(LocalDate.now().plusDays(plan.getDurationInDays()))
-                .status(request.isPaid() ? "ACTIVE" : "PENDING") // Map 'paid' to status
+                .status("PENDING") // temporary
                 .build();
 
         Member savedMember = memberRepository.save(member);
 
+        log.info("Member created with id={}", savedMember.getId());
+
+        // STEP 2: Create Subscription
+        var subscription = subscriptionService.createSubscription(
+                savedMember.getId(),
+                plan.getId(),
+                gym.getId(),
+                request.getInitialPayment() != null
+                        ? BigDecimal.valueOf(request.getInitialPayment())
+                        : BigDecimal.ZERO
+        );
+
+        // STEP 3: Create Payment (only if amount > 0)
+        if (request.getInitialPayment() != null && request.getInitialPayment() > 0) {
+            paymentService.addPayment(
+                    savedMember.getId(),
+                    subscription.getId(),
+                    gym.getId(),
+                    BigDecimal.valueOf(request.getInitialPayment()),
+                    request.getPaymentMode(),
+                    request.getTransactionRef()
+            );
+        }
+
+        // STEP 4: Update Member Snapshot
+        savedMember.setCurrentPlan(plan);
+        savedMember.setSubscriptionStartDate(subscription.getStartDate());
+        savedMember.setExpiryDate(subscription.getEndDate());
+        savedMember.setStatus(subscription.getStatus());
+
+        memberRepository.save(savedMember);
+
+        log.info("Member subscription + payment completed");
+
+        // STEP 5: Send Welcome Notification
         NotificationTemplate welcomeTemplate = notificationTemplateRepository.findByName("WELCOME")
                 .orElseThrow(() -> new NotificationTemplateNotFoundException("Welcome template not found"));
 
         notificationService.sendNotification(savedMember.getId(), welcomeTemplate.getId());
 
+
+
         return savedMember;
     }
 
+
     @Override
     @Transactional
-    public void renewSubscription(Long memberId, Long planId) {
+    public void renewSubscription(Long memberId, Long planId,
+                                  Double amountPaid,
+                                  String paymentMode,
+                                  String transactionRef) {
+
         log.info("Renewing subscription for memberId: {}", memberId);
 
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new MemberNotFoundException("Member not found with id: " + memberId));
+                .orElseThrow(() -> new MemberNotFoundException("Member not found"));
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new PlanNotFoundException("Plan not found with id: " + planId));
+                .orElseThrow(() -> new PlanNotFoundException("Plan not found"));
 
-        LocalDate startDate = member.getExpiryDate().isAfter(LocalDate.now())
-                ? member.getExpiryDate()
-                : LocalDate.now();
+        BigDecimal paid = amountPaid != null ? BigDecimal.valueOf(amountPaid) : BigDecimal.ZERO;
 
-        member.setExpiryDate(startDate.plusDays(plan.getDurationInDays()));
-        member.setStatus("ACTIVE");
+        // STEP 1: Create NEW subscription (DO NOT MODIFY OLD)
+        var subscription = subscriptionService.createSubscription(
+                memberId,
+                planId,
+                member.getGym().getId(),
+                paid
+        );
+
+        // STEP 2: Add payment
+        if (paid.compareTo(BigDecimal.ZERO) > 0) {
+            paymentService.addPayment(
+                    memberId,
+                    subscription.getId(),
+                    member.getGym().getId(),
+                    paid,
+                    paymentMode,
+                    transactionRef
+            );
+        }
+
+        // STEP 3: Update member snapshot
         member.setCurrentPlan(plan);
+        member.setSubscriptionStartDate(subscription.getStartDate());
+        member.setExpiryDate(subscription.getEndDate());
+        member.setStatus(subscription.getStatus());
 
         memberRepository.save(member);
+
+        log.info("Membership renewed successfully for memberId={}", memberId);
     }
+
+
 
     @Override
     public Page<Member> getAllMembersByGym(Long gymId, int page, int size, String status, String search, String planName) {
