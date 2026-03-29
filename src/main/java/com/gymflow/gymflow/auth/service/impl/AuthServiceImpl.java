@@ -116,14 +116,13 @@ public class AuthServiceImpl implements AuthService {
             savedGym.setWhatsappInstance(instanceName);
             savedGym.setWhatsappStatus("QR_READY");
 
-            gymRepository.save(savedGym);
-
         } catch (Exception e) {
             log.error("Failed to create WhatsApp instance: {}", e.getMessage());
 
             savedGym.setWhatsappStatus("FAILED");
-            gymRepository.save(savedGym);
         }
+
+        gymRepository.save(savedGym); // save once
 
         // STEP 4: Create Owner
         GymOwner owner = GymOwner.builder()

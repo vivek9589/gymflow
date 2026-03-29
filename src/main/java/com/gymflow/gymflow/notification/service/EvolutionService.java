@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -29,6 +30,7 @@ public class EvolutionService {
 
         Map<String, Object> body = new HashMap<>();
         body.put("instanceName", instanceName);
+        body.put("integration", "WHATSAPP-BAILEYS");
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", apiKey);
@@ -38,6 +40,9 @@ public class EvolutionService {
 
         log.info("Creating WhatsApp instance: {}", instanceName);
 
-        restTemplate.postForEntity(url, request, String.class);
+        ResponseEntity<String> response =
+                restTemplate.postForEntity(url, request, String.class);
+
+        log.info("Evolution response: {}", response.getBody()); // 🔥 debug
     }
 }
