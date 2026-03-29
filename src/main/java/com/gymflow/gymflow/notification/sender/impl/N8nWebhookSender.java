@@ -48,4 +48,6 @@ public class N8nWebhookSender implements NotificationSender {
             throw new NotificationSendException("n8n webhook send failed"+e);
         }
     }
+
+
 }

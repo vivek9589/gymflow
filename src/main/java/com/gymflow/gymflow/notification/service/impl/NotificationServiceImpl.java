@@ -88,17 +88,26 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             String personalizedMessage = TemplateRenderer.render(template, member);
 
-            // Normalize phone number to E.164 format (+91 for India)
             String normalizedPhone = normalizePhone(member.getPhone());
 
-            notificationSender.send(normalizedPhone, personalizedMessage);
+            // 🔥 NEW: get instance from gym
+            String instanceName = member.getGym().getWhatsappInstance();
+
+            if (instanceName == null) {
+                throw new NotificationSendException("WhatsApp instance not configured for gym");
+            }
+
+            log.info("Sending WhatsApp via instance={} to={}", instanceName, normalizedPhone);
+
+            // 🔥 FIXED CALL
+            notificationSender.send(instanceName, normalizedPhone, personalizedMessage);
 
             event.setStatus(NotificationStatus.SENT);
             event.setProcessedAt(LocalDateTime.now());
-
             logEntry.setStatus("SENT");
 
         } catch (NotificationSendException e) {
+
             event.setStatus(NotificationStatus.FAILED);
             event.setErrorMessage(e.getMessage());
 
@@ -106,7 +115,6 @@ public class NotificationServiceImpl implements NotificationService {
             logEntry.setResponse(e.getMessage());
 
             log.error("Notification send failed for member {}: {}", member.getId(), e.getMessage());
-            throw e;
 
         } finally {
             eventRepository.save(event);
@@ -114,19 +122,25 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+
     /**
      * Utility method to normalize phone numbers into E.164 format.
      * For India, prepend +91 if not already present.
      */
     private String normalizePhone(String rawPhone) {
+
         if (rawPhone == null || rawPhone.isBlank()) {
             throw new NotificationSendException("Phone number is missing");
         }
-        String trimmed = rawPhone.trim();
-        if (!trimmed.startsWith("+")) {
-            // Default to India country code
-            return "+91" + trimmed;
+
+        String phone = rawPhone.replaceAll("[^0-9]", "");
+
+        if (phone.length() == 10) {
+            return "91" + phone;
         }
-        return trimmed;
+
+        return phone;
     }
+
+
 }

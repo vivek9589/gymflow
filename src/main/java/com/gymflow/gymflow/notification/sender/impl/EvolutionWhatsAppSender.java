@@ -23,9 +23,6 @@ public class EvolutionWhatsAppSender implements NotificationSender {
     @Value("${evolution.api-url}")
     private String evolutionApiUrl;
 
-    @Value("${evolution.instance-name}")
-    private String instanceName;
-
     @Value("${evolution.api-key:}")
     private String apiKey;
 
@@ -38,13 +35,20 @@ public class EvolutionWhatsAppSender implements NotificationSender {
         return "WHATSAPP";
     }
 
+    // ❌ Deprecated (keep only if needed for fallback)
     @Override
     public void send(String phone, String message) {
+        throw new UnsupportedOperationException("Use instance-based send method");
+    }
+
+    // ✅ MAIN METHOD (MULTI-TENANT)
+    @Override
+    public void send(String instanceName, String phone, String message) {
 
         String url = evolutionApiUrl + "/message/sendText/" + instanceName;
 
         Map<String, Object> body = new HashMap<>();
-        body.put("number", phone);
+        body.put("number", phone.replace("+", "")); // 🔥 important
         body.put("text", message);
 
         HttpHeaders headers = new HttpHeaders();
@@ -57,6 +61,7 @@ public class EvolutionWhatsAppSender implements NotificationSender {
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
         try {
+            log.info("Sending WhatsApp via instance={} to={}", instanceName, phone);
 
             ResponseEntity<String> response = restTemplate.exchange(
                     url,
@@ -65,11 +70,11 @@ public class EvolutionWhatsAppSender implements NotificationSender {
                     String.class
             );
 
-            log.info("WhatsApp sent to {} via Evolution API. Response: {}", phone, response.getBody());
+            log.info("WhatsApp sent successfully. Response: {}", response.getBody());
 
         } catch (Exception e) {
-
-            log.error("Failed to send WhatsApp to {}: {}", phone, e.getMessage(), e);
+            log.error("Failed to send WhatsApp via instance={} to={}: {}",
+                    instanceName, phone, e.getMessage(), e);
 
             throw new NotificationSendException("Evolution API send failed: " + e.getMessage());
         }
