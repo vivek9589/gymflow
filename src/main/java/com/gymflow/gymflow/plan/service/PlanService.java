@@ -9,6 +9,8 @@ public interface PlanService {
     PlanDTO createPlan(Long gymId, PlanDTO dto);
 
     List<PlanDTO> getPlansByGymId(Long gymId);
+    List<PlanDTO> getAllPlansByGymId(Long gymId);
+
     PlanDTO updatePlanStatus(Long planId, boolean status);
     PlanDTO getPlanById(Long planId);
     PlanDTO updatePlan(Long planId, PlanDTO dto);

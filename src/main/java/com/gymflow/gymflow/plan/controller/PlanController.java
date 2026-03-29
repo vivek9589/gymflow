@@ -43,11 +43,24 @@ public class PlanController {
      * Fetch all active plans for a gym.
      * Accessible to members and owners.
      */
+
+    // @GetMapping("/gym/{gymId}/active")
+
     @GetMapping("/gym/{gymId}")
-    public ResponseEntity<ApiResponse<List<PlanDTO>>> getPlans(@PathVariable Long gymId) {
+    public ResponseEntity<ApiResponse<List<PlanDTO>>> getActivePlans(@PathVariable Long gymId) {
         List<PlanDTO> plans = planService.getPlansByGymId(gymId);
         return ResponseEntity.ok(ApiResponse.success(plans, "Plans retrieved successfully"));
     }
+
+    // Get All PLans
+    @GetMapping("/gym/{gymId}/all")
+    public ResponseEntity<ApiResponse<List<PlanDTO>>> getAllPlans(@PathVariable Long gymId) {
+        List<PlanDTO> plans = planService.getAllPlansByGymId(gymId);
+        return ResponseEntity.ok(ApiResponse.success(plans, "All plans retrieved successfully"));
+    }
+
+
+
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<ApiResponse<PlanDTO>> updateStatus(
