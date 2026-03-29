@@ -75,7 +75,7 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public List<PlanDTO> getPlansByGymId(Long gymId) {
         log.debug("Fetching all plans for gym ID: {}", gymId);
-        return planRepository.findByGymId(gymId)
+        return planRepository.findByGymIdAndIsActiveTrue(gymId)
                 .stream()
                 .map(plan -> modelMapper.map(plan, PlanDTO.class))
                 .collect(Collectors.toList());
