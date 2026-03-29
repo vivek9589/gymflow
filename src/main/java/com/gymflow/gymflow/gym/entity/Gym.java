@@ -39,6 +39,11 @@ public class Gym {
     private Integer establishedYear;
     private String logoUrl;
 
+    @Column(unique = true)
+    private String whatsappInstance;
+
+    private String whatsappStatus; // PENDING, QR_READY, CONNECTED
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
