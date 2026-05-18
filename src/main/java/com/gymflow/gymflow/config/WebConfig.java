@@ -19,7 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
                         "https://fitness-zen-desk.vercel.app",
                         "http://localhost:8080"
                 )
-                .allowedMethods("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS")
+                .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("Authorization", "Content-Type", "Accept")
                 .allowCredentials(true)
                 .maxAge(3600); // Cache pre-flight response for 1 hour
