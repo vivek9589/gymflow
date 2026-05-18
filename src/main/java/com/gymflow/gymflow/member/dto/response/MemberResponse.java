@@ -1,7 +1,7 @@
 package com.gymflow.gymflow.member.dto.response;
 
-
 import lombok.*;
+import java.math.BigDecimal; // Add this import
 import java.time.LocalDate;
 
 @Data
@@ -23,5 +23,5 @@ public class MemberResponse {
     private String planName;
     private LocalDate registrationDate;
     private LocalDate expiryDate;
-    private Double initialPayment;
+    private BigDecimal initialPayment; // Changed from Double to BigDecimal
 }

@@ -6,8 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-
 @Data
 public class MemberJoinRequest {
     @NotBlank(message = "Name is required")
@@ -25,19 +25,18 @@ public class MemberJoinRequest {
     private String fatherName;
     private String permanentAddress;
     private String medicalConditions;
-    private Double initialPayment;
 
-    private String paymentMode; // CASH, UPI
+    // Aligned to BigDecimal to prevent serialization mismatch with Frontend
+    private BigDecimal initialPayment;
+    private String paymentMode; // CASH, UPI, ONLINE
     private String transactionRef;
 
-    // FIX: Variable name should be gymId (lowercase g) to match standard JSON mapping
     @NotNull(message = "Gym ID is required")
     private Long gymId;
 
     @NotNull(message = "Please select a membership plan")
     private Long planId;
 
-    // ADDED: To handle the fields being sent from React
     private LocalDate startDate;
-    private boolean paid;
+    private boolean paid; // Can be used to explicitly check status if needed
 }

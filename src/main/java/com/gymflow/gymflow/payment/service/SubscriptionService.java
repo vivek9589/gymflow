@@ -1,9 +1,8 @@
 package com.gymflow.gymflow.payment.service;
 
 import com.gymflow.gymflow.payment.entity.Subscription;
-
-import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public interface SubscriptionService {
-    Subscription createSubscription(Long memberId, Long planId, Long gymId, BigDecimal amountPaid);
+    Subscription createSubscription(Long memberId, Long planId, Long gymId, boolean isPaid, LocalDate startDate);
 }

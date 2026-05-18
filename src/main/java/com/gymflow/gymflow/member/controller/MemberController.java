@@ -35,16 +35,11 @@ public class MemberController {
      */
     @PostMapping("/join")
     public ResponseEntity<ApiResponse<MemberResponse>> joinGym(@Valid @RequestBody MemberJoinRequest request) {
-        log.info("New member registration request for gym Id: {}", request.getGymId());
-        Member member = memberService.registerMember(request);
+        log.info("Received public registration for gym Id: {}, Name: {}", request.getGymId(), request.getName());
 
-        MemberResponse response = memberService.updateMember(member.getId(),
-                MemberUpdateRequest.builder()
-                        .name(member.getName())
-                        .phone(member.getPhone())
-                        .email(member.getEmail())
-                        .status(member.getStatus())
-                        .build());
+        // Register handles everything cleanly in a single transaction
+        MemberResponse response = memberService.registerMember(request);
+
         return ResponseEntity.ok(ApiResponse.success(response, "Welcome! Registration successful."));
     }
 
@@ -52,14 +47,14 @@ public class MemberController {
     @PostMapping("/renew")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<String>> renewMembership(
-            @RequestBody RenewRequest request) {
+            @jakarta.validation.Valid @RequestBody RenewRequest request) {
 
-        log.info("Renew request for memberId={}", request.getMemberId());
+        log.info("Processing flat renewal request payload for memberId={}", request.getMemberId());
 
         memberService.renewSubscription(
                 request.getMemberId(),
                 request.getPlanId(),
-                request.getAmountPaid(),
+                request.getAmountPaid(), // Now cleanly passes as BigDecimal
                 request.getPaymentMode(),
                 request.getTransactionRef()
         );
@@ -128,18 +123,11 @@ public class MemberController {
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('OWNER')")
     public ResponseEntity<ApiResponse<MemberResponse>> getMemberById(@PathVariable Long id) {
-        log.info("Fetching member by id: {}", id);
-        Member member = memberService.getMemberById(id);
-        MemberResponse response = MemberResponse.builder()
-                .id(member.getId())
-                .name(member.getName())
-                .phone(member.getPhone())
-                .email(member.getEmail())
-                .status(member.getStatus())
-                .planName(member.getCurrentPlan() != null ? member.getCurrentPlan().getName() : "No Active Plan")
-                .registrationDate(member.getRegistrationDate())
-                .expiryDate(member.getExpiryDate())
-                .build();
+        log.info("REST request to fetch member profile for id: {}", id);
+
+        // Service securely fetches and handles mapping entirely internally
+        MemberResponse response = memberService.getMemberById(id);
+
         return ResponseEntity.ok(ApiResponse.success(response, "Member fetched successfully"));
     }
 }

@@ -69,7 +69,8 @@ public class DashboardServiceImpl implements DashboardService {
                 .filter(m -> m.getCurrentPlan() != null)
                 .map(m -> {
                     BigDecimal planPrice = m.getCurrentPlan().getPrice();
-                    BigDecimal paid = BigDecimal.valueOf(m.getInitialPayment() != null ? m.getInitialPayment() : 0.0);
+                    // Directly fallback to BigDecimal.ZERO since m.getInitialPayment() is now a BigDecimal
+                    BigDecimal paid = m.getInitialPayment() != null ? m.getInitialPayment() : BigDecimal.ZERO;
                     BigDecimal balance = planPrice.subtract(paid);
                     return balance.compareTo(BigDecimal.ZERO) > 0 ? balance : BigDecimal.ZERO;
                 })
@@ -79,7 +80,7 @@ public class DashboardServiceImpl implements DashboardService {
                 .filter(m -> m.getCurrentPlan() != null)
                 .filter(m -> {
                     BigDecimal planPrice = m.getCurrentPlan().getPrice();
-                    BigDecimal paid = BigDecimal.valueOf(m.getInitialPayment() != null ? m.getInitialPayment() : 0.0);
+                    BigDecimal paid = m.getInitialPayment() != null ? m.getInitialPayment() : BigDecimal.ZERO;
                     return planPrice.subtract(paid).compareTo(BigDecimal.ZERO) > 0;
                 })
                 .count();

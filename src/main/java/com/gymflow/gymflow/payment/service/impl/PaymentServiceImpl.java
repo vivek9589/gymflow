@@ -9,6 +9,7 @@ import com.gymflow.gymflow.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -19,44 +20,32 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final SubscriptionRepository subscriptionRepository;
-
+    @Override
+    @Transactional
     public Payment addPayment(Long memberId, Long subscriptionId, Long gymId,
                               BigDecimal amount, String mode, String ref) {
-
-        log.info("Adding payment for subscriptionId={}", subscriptionId);
+        log.info("Recording upfront full payment for subscriptionId={}", subscriptionId);
 
         Subscription sub = subscriptionRepository.findById(subscriptionId)
-                .orElseThrow(() -> new RuntimeException("Subscription not found"));
+                .orElseThrow(() -> new RuntimeException("Subscription target record not found"));
 
         Payment payment = Payment.builder()
                 .memberId(memberId)
                 .subscriptionId(subscriptionId)
                 .gymId(gymId)
                 .amount(amount)
-                .paymentMode(mode)
+                .paymentMode(mode != null ? mode : "CASH")
                 .status("SUCCESS")
                 .transactionRef(ref)
                 .build();
 
-        paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
 
-        // update subscription
-        BigDecimal newPaid = sub.getPaidAmount().add(amount);
-        BigDecimal newDue = sub.getTotalAmount().subtract(newPaid);
-
-        sub.setPaidAmount(newPaid);
-        sub.setDueAmount(newDue);
-
-        if (newDue.compareTo(BigDecimal.ZERO) == 0) {
-            sub.setStatus("ACTIVE");
-        } else {
-            sub.setStatus("PARTIAL");
-        }
-
+        // Instantly transition the linked subscription container to ACTIVE state
+        sub.setStatus("ACTIVE");
         subscriptionRepository.save(sub);
 
-        log.info("Payment added successfully for subscriptionId={}", subscriptionId);
-
-        return payment;
+        log.info("Payment saved successfully. Subscription {} is now fully ACTIVE", subscriptionId);
+        return savedPayment;
     }
 }
