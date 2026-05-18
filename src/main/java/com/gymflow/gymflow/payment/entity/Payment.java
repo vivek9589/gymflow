@@ -1,10 +1,7 @@
 package com.gymflow.gymflow.payment.entity;
 
-
-
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -26,10 +23,10 @@ public class Payment {
     private Long gymId;
 
     private BigDecimal amount;
-    private String paymentMode; // CASH, UPI, CARD
-    private String status; // SUCCESS, PENDING
+    private String paymentMode; // CASH, UPI, ONLINE_GATEWAY
+    private String status; // SUCCESS, PENDING, FAILED
 
-    private String transactionRef;
+    private String transactionRef; // Manual reference ID or online gateway tracking token
 
     private LocalDateTime createdAt;
 

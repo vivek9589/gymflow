@@ -23,37 +23,25 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final PlanRepository planRepository;
 
     @Override
-    public Subscription createSubscription(Long memberId, Long planId, Long gymId, BigDecimal amountPaid) {
-
-        log.info("Creating subscription for memberId={}", memberId);
+    public Subscription createSubscription(Long memberId, Long planId, Long gymId, boolean isPaid, LocalDate startDate) {
+        log.info("Creating flat subscription container for memberId={}", memberId);
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new RuntimeException("Plan not found"));
+                .orElseThrow(() -> new RuntimeException("Selected membership plan not found"));
 
-        LocalDate startDate = LocalDate.now();
-        LocalDate endDate = startDate.plusDays(plan.getDurationInDays());
-
-        BigDecimal total = plan.getPrice();
-        BigDecimal due = total.subtract(amountPaid);
-
-        String status = due.compareTo(BigDecimal.ZERO) == 0 ? "ACTIVE" : "PARTIAL";
+        LocalDate start = (startDate != null) ? startDate : LocalDate.now();
+        LocalDate endDate = start.plusDays(plan.getDurationInDays());
 
         Subscription subscription = Subscription.builder()
                 .memberId(memberId)
                 .planId(planId)
                 .gymId(gymId)
-                .startDate(startDate)
+                .startDate(start)
                 .endDate(endDate)
-                .totalAmount(total)
-                .paidAmount(amountPaid)
-                .dueAmount(due)
-                .status(status)
+                .totalAmount(plan.getPrice())
+                .status(isPaid ? "ACTIVE" : "PENDING")
                 .build();
 
-        Subscription saved = subscriptionRepository.save(subscription);
-
-        log.info("Subscription created with id={}", saved.getId());
-
-        return saved;
+        return subscriptionRepository.save(subscription);
     }
 }

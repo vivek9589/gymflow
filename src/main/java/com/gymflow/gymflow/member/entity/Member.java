@@ -7,13 +7,9 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.math.BigDecimal; // Add this import
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-
-/**
- * Represents a Gym Member entity with personal details,
- * subscription information, and links to Gym and Plan.
- */
 
 @Entity
 @Table(name = "members")
@@ -47,7 +43,7 @@ public class Member {
     @Column(columnDefinition = "TEXT")
     private String medicalConditions;
 
-    private Double initialPayment;
+    private BigDecimal initialPayment; // Changed from Double to BigDecimal
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "gym_id", nullable = false)
@@ -58,7 +54,7 @@ public class Member {
     private LocalDate registrationDate;
 
     @Column(nullable = false)
-    private String status ;
+    private String status;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "plan_id")

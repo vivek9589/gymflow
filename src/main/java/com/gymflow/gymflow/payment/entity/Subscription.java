@@ -1,9 +1,7 @@
 package com.gymflow.gymflow.payment.entity;
 
-
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -28,11 +26,9 @@ public class Subscription {
     private LocalDate startDate;
     private LocalDate endDate;
 
-    private BigDecimal totalAmount;
-    private BigDecimal paidAmount;
-    private BigDecimal dueAmount;
+    private BigDecimal totalAmount; // Flat structural plan cost
 
-    private String status; // ACTIVE, PARTIAL, EXPIRED
+    private String status; // ACTIVE, PENDING, EXPIRED
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -15,6 +15,7 @@ import com.gymflow.gymflow.member.service.MemberService;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
 import com.gymflow.gymflow.notification.service.NotificationService;
+import com.gymflow.gymflow.payment.entity.Subscription;
 import com.gymflow.gymflow.payment.service.PaymentService;
 import com.gymflow.gymflow.payment.service.SubscriptionService;
 import com.gymflow.gymflow.plan.entity.Plan;
@@ -53,9 +54,8 @@ public class MemberServiceImpl implements MemberService {
 
     @Override
     @Transactional
-    public Member registerMember(MemberJoinRequest request) {
-
-        log.info("Registering new member for gym Id: {}", request.getGymId());
+    public MemberResponse registerMember(MemberJoinRequest request) {
+        log.info("Processing flat billing registration for gym Id: {}", request.getGymId());
 
         Gym gym = gymRepository.findById(request.getGymId())
                 .orElseThrow(() -> new GymNotFoundException("Invalid Gym ID: " + request.getGymId()));
@@ -65,7 +65,11 @@ public class MemberServiceImpl implements MemberService {
 
         LocalDate start = (request.getStartDate() != null) ? request.getStartDate() : LocalDate.now();
 
-        // STEP 1: Create Member (NO PAYMENT LOGIC HERE)
+        // Calculate binary verification status from both incoming request modes
+        boolean isPaid = request.isPaid() ||
+                (request.getInitialPayment() != null && request.getInitialPayment().compareTo(BigDecimal.ZERO) > 0);
+
+        // 1. Persist new athlete entity mapping access lifecycle flag
         Member member = Member.builder()
                 .name(request.getName())
                 .phone(request.getPhone())
@@ -78,106 +82,134 @@ public class MemberServiceImpl implements MemberService {
                 .fatherName(request.getFatherName())
                 .permanentAddress(request.getPermanentAddress())
                 .medicalConditions(request.getMedicalConditions())
+                .initialPayment(request.getInitialPayment()) // Populated missing mapping field
                 .gym(gym)
-                .status("PENDING") // temporary
+                .registrationDate(LocalDate.now()) // Safe fallback value before Hibernate transaction commits
+                .status(isPaid ? "ACTIVE" : "PENDING")
                 .build();
 
         Member savedMember = memberRepository.save(member);
 
-        log.info("Member created with id={}", savedMember.getId());
-
-        // STEP 2: Create Subscription
-        var subscription = subscriptionService.createSubscription(
+        // 2. Build Unsplitted Flat Subscription
+        Subscription subscription = subscriptionService.createSubscription(
                 savedMember.getId(),
                 plan.getId(),
                 gym.getId(),
-                request.getInitialPayment() != null
-                        ? BigDecimal.valueOf(request.getInitialPayment())
-                        : BigDecimal.ZERO
+                isPaid,
+                start
         );
 
-        // STEP 3: Create Payment (only if amount > 0)
-        if (request.getInitialPayment() != null && request.getInitialPayment() > 0) {
+        // 3. Create full upfront transaction ledger if paid tracking criteria evaluates to true
+        if (isPaid) {
+            BigDecimal paymentAmount = (request.getInitialPayment() != null && request.getInitialPayment().compareTo(BigDecimal.ZERO) > 0)
+                    ? request.getInitialPayment()
+                    : plan.getPrice();
+
             paymentService.addPayment(
                     savedMember.getId(),
                     subscription.getId(),
                     gym.getId(),
-                    BigDecimal.valueOf(request.getInitialPayment()),
+                    paymentAmount,
                     request.getPaymentMode(),
                     request.getTransactionRef()
             );
         }
 
-        // STEP 4: Update Member Snapshot
+        // 4. Update core status and caching snapshots
         savedMember.setCurrentPlan(plan);
         savedMember.setSubscriptionStartDate(subscription.getStartDate());
         savedMember.setExpiryDate(subscription.getEndDate());
         savedMember.setStatus(subscription.getStatus());
 
-        memberRepository.save(savedMember);
+        // Using saveAndFlush forces Hibernate to sync timestamps with the database immediately
+        Member finalSavedMember = memberRepository.saveAndFlush(savedMember);
 
-        log.info("Member subscription + payment completed");
+        log.info("Streamlined member registration cycle complete for system ID: {}", finalSavedMember.getId());
 
-        // STEP 5: Send Welcome Notification
-        NotificationTemplate welcomeTemplate = notificationTemplateRepository.findByName("WELCOME")
-                .orElseThrow(() -> new NotificationTemplateNotFoundException("Welcome template not found"));
+        // 5. Fire notifications context safely
+        try {
+            if ("ACTIVE".equals(finalSavedMember.getStatus())) {
+                notificationTemplateRepository.findByName("WELCOME")
+                        .ifPresent(template -> notificationService.sendNotification(finalSavedMember.getId(), template.getId()));
+            }
+        } catch (Exception e) {
+            log.error("Guarded welcome message thread dispatch failure for ID: {}", finalSavedMember.getId(), e);
+        }
 
-        notificationService.sendNotification(savedMember.getId(), welcomeTemplate.getId());
+        return convertToMemberResponse(finalSavedMember);
+    }
 
-
-
-        return savedMember;
+    private MemberResponse convertToMemberResponse(Member member) {
+        return MemberResponse.builder()
+                .id(member.getId())
+                .name(member.getName())
+                .phone(member.getPhone())
+                .email(member.getEmail())
+                .bloodGroup(member.getBloodGroup())
+                .weight(member.getWeight())
+                .height(member.getHeight())
+                .occupation(member.getOccupation())
+                .permanentAddress(member.getPermanentAddress())
+                .medicalConditions(member.getMedicalConditions())
+                .status(member.getStatus())
+                .expiryDate(member.getExpiryDate())
+                .registrationDate(member.getRegistrationDate()) // Mapped missing field
+                .initialPayment(member.getInitialPayment())   // Mapped missing field
+                .planName(member.getCurrentPlan() != null ? member.getCurrentPlan().getName() : null) // Mapped missing field
+                .build();
     }
 
 
     @Override
     @Transactional
     public void renewSubscription(Long memberId, Long planId,
-                                  Double amountPaid,
+                                  BigDecimal amountPaid,
                                   String paymentMode,
                                   String transactionRef) {
 
-        log.info("Renewing subscription for memberId: {}", memberId);
+        log.info("Processing simplified subscription renewal transaction for memberId: {}", memberId);
 
+        // Fetch core dependencies
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("Member not found"));
 
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new PlanNotFoundException("Plan not found"));
 
-        BigDecimal paid = amountPaid != null ? BigDecimal.valueOf(amountPaid) : BigDecimal.ZERO;
+        // Binary check: Resolve if the registration renewal is fully paid or waiting for gateway authorization
+        boolean isPaid = (amountPaid != null && amountPaid.compareTo(BigDecimal.ZERO) > 0);
 
-        // STEP 1: Create NEW subscription (DO NOT MODIFY OLD)
+        // STEP 1: Create NEW flat subscription container (Binary ACTIVE/PENDING state, no split-payments)
         var subscription = subscriptionService.createSubscription(
                 memberId,
                 planId,
                 member.getGym().getId(),
-                paid
+                isPaid,
+                LocalDate.now() // Explicitly setting current date as start context for renewal
         );
 
-        // STEP 2: Add payment
-        if (paid.compareTo(BigDecimal.ZERO) > 0) {
+        // STEP 2: Record upfront full payment ledger if applicable
+        if (isPaid) {
             paymentService.addPayment(
                     memberId,
                     subscription.getId(),
                     member.getGym().getId(),
-                    paid,
+                    amountPaid,
                     paymentMode,
                     transactionRef
             );
         }
 
-        // STEP 3: Update member snapshot
+        // STEP 3: Synchronize member snapshot fields with the new active subscription state
         member.setCurrentPlan(plan);
         member.setSubscriptionStartDate(subscription.getStartDate());
         member.setExpiryDate(subscription.getEndDate());
-        member.setStatus(subscription.getStatus());
+        member.setStatus(subscription.getStatus()); // Will cleanly match subscription's ACTIVE or PENDING state
 
         memberRepository.save(member);
 
-        log.info("Membership renewed successfully for memberId={}", memberId);
+        log.info("Membership renewed successfully with status '{}' for memberId={}", subscription.getStatus(), memberId);
     }
-
 
 
     @Override
@@ -238,12 +270,15 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    public Member getMemberById(Long id) {
-        log.info("Fetching member by id: {}", id);
-        return memberRepository.findById(id)
-                .orElseThrow(() -> new MemberNotFoundException("Member not found with id: " + id));
-    }
+    @Transactional(readOnly = true) // Keeps Hibernate session open to map lazy-loaded data safely
+    public MemberResponse getMemberById(Long id) {
+        log.info("Fetching member profile details for id: {}", id);
 
+        Member member = memberRepository.findById(id)
+                .orElseThrow(() -> new MemberNotFoundException("Member not found with id: " + id));
+
+        return mapToResponse(member);
+    }
     @Override
     public List<Member> searchMembers(Long gymId, String query) {
         log.info("Searching members in gymId: {} with query: {}", gymId, query);
