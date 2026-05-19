@@ -16,7 +16,8 @@ import java.util.List;
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
     // Find the last record for a member that hasn't checked out yet
-    Optional<Attendance> findFirstByMemberIdAndCheckOutTimeIsNullOrderByCheckInTimeDesc(Long memberId);
+    Optional<Attendance> findFirstByMemberIdAndCheckInTimeAfterAndCheckOutTimeIsNullOrderByCheckInTimeDesc(
+            Long memberId, LocalDateTime afterTime);
 
     List<Attendance> findByGymIdOrderByCheckInTimeDesc(Long gymId);
 
@@ -43,6 +44,7 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
             "FROM attendance a " +
             "JOIN members m ON a.member_id = m.id " +
             "WHERE a.gym_id = :gymId " +
+            "AND a.check_in_time >= CURRENT_DATE " + // <-- CRITICAL: Restricts data strictly to today
             "ORDER BY a.check_in_time DESC",
             nativeQuery = true)
     List<Object[]> findLiveTrackerData(@Param("gymId") Long gymId);

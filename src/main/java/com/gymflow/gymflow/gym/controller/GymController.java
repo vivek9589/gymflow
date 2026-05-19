@@ -1,6 +1,7 @@
 package com.gymflow.gymflow.gym.controller;
 
 import com.gymflow.gymflow.common.dto.ApiResponse;
+import com.gymflow.gymflow.gym.dto.request.GymLocationUpdateRequest;
 import com.gymflow.gymflow.gym.dto.request.GymRequest;
 import com.gymflow.gymflow.gym.dto.response.GymResponse;
 import com.gymflow.gymflow.gym.service.GymService;
@@ -12,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/gyms")
@@ -36,6 +38,24 @@ public class GymController {
             @Valid @RequestBody GymRequest request) {
         log.info("Owner updating gym with ID: {}", id);
         return ResponseEntity.ok(ApiResponse.success(gymService.updateGym(id, request), "Gym updated successfully"));
+    }
+
+    @PutMapping("/{gymId}/location")
+    public ResponseEntity<?> updateLocationGeofence(
+            @PathVariable Long gymId,
+            @RequestBody GymLocationUpdateRequest request
+    ) {
+        try {
+            gymService.updateGymGeofence(gymId, request);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Gym geofence spatial boundaries updated successfully!"
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Internal error logging location map configuration."));
+        }
     }
 
     @GetMapping("/{id}")

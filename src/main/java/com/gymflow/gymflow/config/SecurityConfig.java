@@ -40,6 +40,7 @@ public class SecurityConfig {
                                 "/api/members/join",
                                 "/api/gyms/public/**",
                                 "/api/attendance/scan/**",
+                                "/api/attendance/toggle",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",

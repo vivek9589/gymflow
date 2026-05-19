@@ -42,6 +42,11 @@ public class Gym {
     @Column(unique = true)
     private String whatsappInstance;
 
+    // Match the exact primitive wrapper object to map against the database safely
+    private Double latitude;
+    private Double longitude;
+
+
     private String whatsappStatus; // PENDING, QR_READY, CONNECTED
 
     @Column(columnDefinition = "TEXT")

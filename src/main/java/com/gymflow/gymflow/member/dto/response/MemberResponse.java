@@ -24,4 +24,5 @@ public class MemberResponse {
     private LocalDate registrationDate;
     private LocalDate expiryDate;
     private BigDecimal initialPayment; // Changed from Double to BigDecimal
+    private String checkInToken;
 }
