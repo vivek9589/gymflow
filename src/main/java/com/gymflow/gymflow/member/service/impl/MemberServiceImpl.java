@@ -307,6 +307,7 @@ public class MemberServiceImpl implements MemberService {
                 .expiryDate(member.getExpiryDate())
                 .initialPayment(member.getInitialPayment())
                 .planName(member.getCurrentPlan() != null ? member.getCurrentPlan().getName() : "No Active Plan")
+                .checkInToken(member.getCheckInToken())
                 .build();
     }
 }
