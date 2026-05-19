@@ -86,6 +86,7 @@ public class MemberServiceImpl implements MemberService {
                 .gym(gym)
                 .registrationDate(LocalDate.now()) // Safe fallback value before Hibernate transaction commits
                 .status(isPaid ? "ACTIVE" : "PENDING")
+                .checkInToken(java.util.UUID.randomUUID().toString())
                 .build();
 
         Member savedMember = memberRepository.save(member);
@@ -156,6 +157,7 @@ public class MemberServiceImpl implements MemberService {
                 .registrationDate(member.getRegistrationDate()) // Mapped missing field
                 .initialPayment(member.getInitialPayment())   // Mapped missing field
                 .planName(member.getCurrentPlan() != null ? member.getCurrentPlan().getName() : null) // Mapped missing field
+                .checkInToken(member.getCheckInToken())
                 .build();
     }
 

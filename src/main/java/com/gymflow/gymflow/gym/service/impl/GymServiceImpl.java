@@ -3,6 +3,7 @@ package com.gymflow.gymflow.gym.service.impl;
 import com.gymflow.gymflow.common.exception.BusinessException;
 
 import com.gymflow.gymflow.common.exception.GymNotFoundException;
+import com.gymflow.gymflow.gym.dto.request.GymLocationUpdateRequest;
 import com.gymflow.gymflow.gym.dto.request.GymRequest;
 import com.gymflow.gymflow.gym.dto.response.GymResponse;
 import com.gymflow.gymflow.gym.entity.Gym;
@@ -65,5 +66,23 @@ public class GymServiceImpl implements GymService {
         response.setAddress(gym.getAddress());
         response.setContactNumber(gym.getContactNumber());
         return response;
+    }
+
+
+    @Override
+    @Transactional
+    public void updateGymGeofence(Long gymId, GymLocationUpdateRequest request) {
+        if (request.getLatitude() == null || request.getLongitude() == null) {
+            throw new IllegalArgumentException("Coordinates missing: Latitude and Longitude metrics are required.");
+        }
+
+        Gym gym = gymRepository.findById(gymId)
+                .orElseThrow(() -> new IllegalArgumentException("Gym configuration workspace profile target missing for ID: " + gymId));
+
+        gym.setLatitude(request.getLatitude());
+        gym.setLongitude(request.getLongitude());
+
+        // Explicitly saved, though @Transactional dirty-checking will commit this on completion automatically
+        gymRepository.save(gym);
     }
 }

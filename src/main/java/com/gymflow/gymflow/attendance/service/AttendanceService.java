@@ -18,4 +18,7 @@ public interface AttendanceService {
 
     List<Attendance> getTodayAttendance(Long gymId);
     List<Attendance> getAttendanceReport(Long gymId, LocalDate startDate, LocalDate endDate);
+
+    String processSelfToggleAttendance(String token, double memberLat, double memberLon);
+
 }

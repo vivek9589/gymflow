@@ -1,6 +1,7 @@
 package com.gymflow.gymflow.attendance.controller;
 
 
+import com.gymflow.gymflow.attendance.dto.request.SelfCheckInRequest;
 import com.gymflow.gymflow.attendance.dto.response.AttendanceLiveDTO;
 import com.gymflow.gymflow.attendance.entity.Attendance;
 import com.gymflow.gymflow.attendance.service.AttendanceService;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 
 @RestController
@@ -77,4 +79,21 @@ public class AttendanceController {
         return ResponseEntity.ok(ApiResponse.success(
                 attendanceService.getAttendanceReport(gymId, startDate, endDate), "Attendance report fetched"));
     }
+
+    @PostMapping("/toggle")
+    public ResponseEntity<?> toggleAttendance(@RequestBody SelfCheckInRequest request) {
+        try {
+            String message = attendanceService.processSelfToggleAttendance(
+                    request.getToken(),
+                    request.getLatitude(),
+                    request.getLongitude()
+            );
+            return ResponseEntity.ok(Map.of("success", true, "message", message));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Server error processing entry request."));
+        }
+    }
+
 }

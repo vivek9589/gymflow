@@ -39,6 +39,7 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
 
     List<Member> findByGymIdAndExpiryDateBetweenAndDeletedFalse(Long gymId, LocalDate start, LocalDate end);
 
+    Optional<Member> findByCheckInToken(String checkInToken);
 
     // --- Revenue Calculation ---
     // NOTE: We usually keep deleted members in revenue calculations

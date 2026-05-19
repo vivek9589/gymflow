@@ -63,6 +63,9 @@ public class Member {
     private LocalDate subscriptionStartDate;
     private LocalDate expiryDate;
 
+    @Column(name = "check_in_token", unique = true, nullable = false)
+    private String checkInToken;
+
     @Builder.Default
     @Column(nullable = false)
     private boolean deleted = false;
