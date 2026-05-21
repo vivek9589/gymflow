@@ -81,19 +81,24 @@ public class AttendanceController {
     }
 
     @PostMapping("/toggle")
-    public ResponseEntity<?> toggleAttendance(@RequestBody SelfCheckInRequest request) {
-        try {
-            String message = attendanceService.processSelfToggleAttendance(
-                    request.getToken(),
-                    request.getLatitude(),
-                    request.getLongitude()
-            );
-            return ResponseEntity.ok(Map.of("success", true, "message", message));
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("success", false, "message", "Server error processing entry request."));
-        }
+    public ResponseEntity<ApiResponse<String>> toggleAttendance(
+            @RequestBody SelfCheckInRequest request
+    ) {
+
+        log.info(
+                "Attendance toggle request received -> token: {}",
+                request.getToken()
+        );
+
+        String message = attendanceService.processSelfToggleAttendance(
+                request.getToken(),
+                request.getLatitude(),
+                request.getLongitude()
+        );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(message)
+        );
     }
 
 }

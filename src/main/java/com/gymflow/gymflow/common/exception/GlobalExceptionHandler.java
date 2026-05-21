@@ -178,5 +178,37 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidAccessPassException.class)
+    public ResponseEntity<ApiResponse<String>> handleInvalidAccessPass(
+            InvalidAccessPassException ex
+    ) {
+
+        log.warn("Invalid access pass: {}", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(GeofenceViolationException.class)
+    public ResponseEntity<ApiResponse<String>> handleGeofenceViolation(
+            GeofenceViolationException ex
+    ) {
+
+        log.warn("Geofence violation: {}", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
+
+    @ExceptionHandler(GymConfigurationException.class)
+    public ResponseEntity<ApiResponse<String>> handleGymConfiguration(
+            GymConfigurationException ex
+    ) {
+
+        log.error("Gym configuration error: {}", ex.getMessage());
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error(ex.getMessage()));
+    }
 
 }
