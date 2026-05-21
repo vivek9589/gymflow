@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -33,21 +32,29 @@ public class SecurityConfig {
 
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // hook in CORS rules
+                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // hooks in CORS rules
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                // 🚀 1. Permit Frontend Router Entry Routes
+                                "/",
+                                "/reset-password",
+                                "/index.html",
+                                "/assets/**",
+                                "/favicon.ico",
+
+                                // 🚀 2. Public API Endpoints (Fixed missing leading slashes)
                                 "/api/auth/**",
                                 "/api/members/join",
                                 "/api/gyms/public/**",
                                 "/api/attendance/scan/**",
                                 "/api/attendance/toggle",
+                                "/api/dashboard/**",
+
+                                // 🚀 3. API Documentation & Swagger UI Resources
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/webjars/**",
-                                "/api/dashboard/**",
-                                "api/auth/forgot-password",
-                                "api/auth/reset-password"
+                                "/webjars/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
