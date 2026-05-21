@@ -6,16 +6,20 @@ import com.gymflow.gymflow.auth.dto.request.UpdateProfileRequest;
 import com.gymflow.gymflow.auth.dto.response.LoginResponse;
 import com.gymflow.gymflow.auth.dto.response.ProfileResponseDTO;
 import com.gymflow.gymflow.auth.entity.GymOwner;
+import com.gymflow.gymflow.auth.entity.PasswordResetToken;
 import com.gymflow.gymflow.auth.enums.Role;
 import com.gymflow.gymflow.auth.repository.GymOwnerRepository;
+import com.gymflow.gymflow.auth.repository.PasswordResetTokenRepository;
 import com.gymflow.gymflow.auth.security.JwtUtil;
 import com.gymflow.gymflow.auth.service.AuthService;
 import com.gymflow.gymflow.common.exception.InvalidCredentialsException;
+import com.gymflow.gymflow.common.exception.InvalidTokenException;
 import com.gymflow.gymflow.common.exception.UserAlreadyExistsException;
 import com.gymflow.gymflow.common.exception.UserNotFoundException;
 import com.gymflow.gymflow.gym.dto.response.GymResponseDTO;
 import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
+import com.gymflow.gymflow.notification.service.EmailService;
 import com.gymflow.gymflow.notification.service.EvolutionService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -26,6 +30,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Implementation of AuthService.
@@ -45,6 +52,9 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final GymRepository gymRepository;
     private final EvolutionService evolutionService;
+    private final PasswordResetTokenRepository tokenRepository;
+    private final GymOwnerRepository gymOwnerRepository;
+    private final EmailService emailService;
 
 
     @Override
@@ -158,29 +168,56 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional
     public void forgotPassword(String email) {
         log.info("Password reset requested for email={}", email);
 
-        GymOwner owner = authRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException(email));
+        // Security practice: Don't throw UserNotFoundException here.
+        // It prevents external actors from fishing/harvesting valid system accounts.
+        Optional<GymOwner> ownerOpt = gymOwnerRepository.findByEmail(email);
 
-        // TODO: Generate reset token and send via email service
-        log.info("Password reset token generated for email={}", email);
+        if (ownerOpt.isPresent()) {
+            GymOwner owner = ownerOpt.get();
+
+            // Evict any existing legacy tokens for this owner before spinning up a new one
+            tokenRepository.deleteByGymOwner(owner);
+
+            String token = UUID.randomUUID().toString();
+            PasswordResetToken resetToken = new PasswordResetToken(token, owner, 15);
+            tokenRepository.save(resetToken);
+
+            // Push background worker thread to process SMTP mail
+            emailService.sendPasswordResetEmail(owner.getEmail(), token);
+            log.info("Password reset token generated and email dispatched for owner id={}", owner.getId());
+        } else {
+            log.warn("Password reset link requested for non-existent email registration: {}", email);
+        }
     }
 
     @Override
     @Transactional
     public void resetPassword(String token, String newPassword) {
-        log.info("Password reset attempt with token={}", token);
+        log.info("Password reset attempt executing via payload verification token");
 
-        // TODO: Validate token, fetch user
-        GymOwner owner = authRepository.findByEmail("dummy@example.com") // Replace with token lookup
-                .orElseThrow(() -> new UserNotFoundException("dummy@example.com"));
+        // 1. Fetch token
+        PasswordResetToken resetToken = tokenRepository.findByToken(token)
+                .orElseThrow(() -> new InvalidTokenException("The password reset token is invalid or does not exist."));
 
+        // 2. Validate window constraints
+        if (resetToken.isExpired()) {
+            tokenRepository.delete(resetToken);
+            throw new InvalidTokenException("The password reset token has expired. Please request a new link.");
+        }
+
+        // 3. Mutate entity data status
+        GymOwner owner = resetToken.getGymOwner();
         owner.setPassword(passwordEncoder.encode(newPassword));
-        authRepository.save(owner);
+        gymOwnerRepository.save(owner);
 
-        log.info("Password reset successful for email={}", owner.getEmail());
+        // 4. Purge token to avoid replay attacks
+        tokenRepository.delete(resetToken);
+
+        log.info("Password reset successful for gym owner email={}", owner.getEmail());
     }
 
     @Override
