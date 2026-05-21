@@ -16,17 +16,28 @@ import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
-@NoArgsConstructor // Added for JSON deserialization
+@NoArgsConstructor
 @Builder
 public class ApiResponse<T> {
+
     private boolean success;
+
     private String message;
+
     private T data;
 
-    @Builder.Default // Ensures the builder uses the current time if not provided
+    @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
 
-    public static <T> ApiResponse<T> success(T data, String message) {
+    // =====================================================
+    // SUCCESS WITH DATA + MESSAGE
+    // =====================================================
+
+    public static <T> ApiResponse<T> success(
+            T data,
+            String message
+    ) {
+
         return ApiResponse.<T>builder()
                 .success(true)
                 .message(message)
@@ -34,7 +45,24 @@ public class ApiResponse<T> {
                 .build();
     }
 
+    // =====================================================
+    // SUCCESS WITH ONLY DATA
+    // =====================================================
+
+    public static <T> ApiResponse<T> success(T data) {
+
+        return ApiResponse.<T>builder()
+                .success(true)
+                .data(data)
+                .build();
+    }
+
+    // =====================================================
+    // ERROR RESPONSE
+    // =====================================================
+
     public static <T> ApiResponse<T> error(String message) {
+
         return ApiResponse.<T>builder()
                 .success(false)
                 .message(message)

@@ -127,50 +127,176 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
 
     @Transactional
-    public String processSelfToggleAttendance(String token, double memberLat, double memberLon) {
-        // 1. Fetch member by their unique token
+    public String processSelfToggleAttendance(
+            String token,
+            double memberLat,
+            double memberLon
+    ) {
+
+        log.info("Attendance process started");
+
+        // =====================================================
+        // FETCH MEMBER
+        // =====================================================
+
         Member member = memberRepository.findByCheckInToken(token)
-                .orElseThrow(() -> new IllegalArgumentException("Invalid or corrupted access pass link."));
+                .orElseThrow(() -> {
+
+                    log.warn("Invalid access token -> {}", token);
+
+                    return new InvalidAccessPassException(
+                            "Invalid or corrupted access pass link."
+                    );
+                });
 
         Gym gym = member.getGym();
+
+        // =====================================================
+        // VALIDATE GYM
+        // =====================================================
+
         if (gym == null) {
-            throw new IllegalStateException("Your profile is not assigned to an active gym location.");
+
+            log.error(
+                    "Gym missing for member -> {}",
+                    member.getId()
+            );
+
+            throw new GymConfigurationException(
+                    "Your profile is not assigned to an active gym."
+            );
         }
 
-        // 2. Validate membership plan validity
+        // =====================================================
+        // VALIDATE MEMBERSHIP
+        // =====================================================
+
+        if (member.getExpiryDate() == null) {
+
+            log.error(
+                    "Membership expiry date missing -> member {}",
+                    member.getId()
+            );
+
+            throw new GymConfigurationException(
+                    "Membership validity unavailable."
+            );
+        }
+
         if (member.getExpiryDate().isBefore(LocalDate.now())) {
-            throw new IllegalStateException("Access Denied: Your membership plan expired on " + member.getExpiryDate());
+
+            log.warn(
+                    "Membership expired -> {}",
+                    member.getName()
+            );
+
+            throw new MembershipExpiredException(
+                    "Access Denied: Membership expired on "
+                            + member.getExpiryDate()
+            );
         }
 
-        // 3. Geofence Check (Validates if member is within 50 meters of the gym)
-        double distance = calculateHaversineDistance(memberLat, memberLon, gym.getLatitude(), gym.getLongitude());
-        if (distance > 50.0) {
-            throw new IllegalStateException("Access Denied! You must be inside the gym premises to check in or out.");
+        // =====================================================
+        // VALIDATE GYM GPS
+        // =====================================================
+
+        if (gym.getLatitude() == null || gym.getLongitude() == null) {
+
+            log.error(
+                    "Gym GPS not configured -> gym {}",
+                    gym.getId()
+            );
+
+            throw new GymConfigurationException(
+                    "Gym location services unavailable."
+            );
         }
 
-        // 4. Determine Action: Check-In vs Check-Out Toggle
+        // =====================================================
+        // DISTANCE CALCULATION
+        // =====================================================
+
+        double distance = calculateHaversineDistance(
+                memberLat,
+                memberLon,
+                gym.getLatitude(),
+                gym.getLongitude()
+        );
+
+        log.info(
+                "Distance Calculated -> {} meters",
+                distance
+        );
+
+        // Increased radius for mobile GPS inaccuracies
+        if (distance > 150.0) {
+
+            log.warn(
+                    "Geofence blocked -> member {} distance {}m",
+                    member.getName(),
+                    distance
+            );
+
+            throw new GeofenceViolationException(
+                    "Access Denied! You must be inside the gym premises."
+            );
+        }
+
+        // =====================================================
+        // FIND ACTIVE SESSION
+        // =====================================================
+
         LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
 
-        // Find an open session for this member that started today
-        Optional<Attendance> activeSession = attendanceRepository
-                .findFirstByMemberIdAndCheckInTimeAfterAndCheckOutTimeIsNullOrderByCheckInTimeDesc(member.getId(), startOfToday);
+        Optional<Attendance> activeSession =
+                attendanceRepository
+                        .findFirstByMemberIdAndCheckInTimeAfterAndCheckOutTimeIsNullOrderByCheckInTimeDesc(
+                                member.getId(),
+                                startOfToday
+                        );
+
+        // =====================================================
+        // CHECK OUT
+        // =====================================================
 
         if (activeSession.isPresent()) {
-            // Member is already inside -> Perform Check-Out
+
             Attendance attendance = activeSession.get();
+
             attendance.setCheckOutTime(LocalDateTime.now());
+
             attendanceRepository.save(attendance);
-            return "Goodbye " + member.getName() + "! Checked out successfully.";
-        } else {
-            // No active session today -> Perform Check-In
-            Attendance attendance = new Attendance();
-            attendance.setMember(member);
-            attendance.setGym(gym);
-            attendance.setCheckInTime(LocalDateTime.now());
-            attendance.setCheckOutTime(null);
-            attendanceRepository.save(attendance);
-            return "Welcome " + member.getName() + "! Checked in successfully.";
+
+            log.info(
+                    "CHECK-OUT SUCCESS -> {}",
+                    member.getName()
+            );
+
+            return "Goodbye "
+                    + member.getName()
+                    + "! Checked out successfully.";
         }
+
+        // =====================================================
+        // CHECK IN
+        // =====================================================
+
+        Attendance attendance = new Attendance();
+
+        attendance.setMember(member);
+        attendance.setGym(gym);
+        attendance.setCheckInTime(LocalDateTime.now());
+
+        attendanceRepository.save(attendance);
+
+        log.info(
+                "CHECK-IN SUCCESS -> {}",
+                member.getName()
+        );
+
+        return "Welcome "
+                + member.getName()
+                + "! Checked in successfully.";
     }
 
     // Mathematical formula to calculate distance in meters between two GPS coordinates

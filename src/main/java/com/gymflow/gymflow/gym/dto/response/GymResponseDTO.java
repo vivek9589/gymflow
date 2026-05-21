@@ -19,4 +19,8 @@ public class GymResponseDTO {
     private String logoUrl;
     private String description;
     private Integer establishedYear;
+
+    // Match the exact primitive wrapper object to map against the database safely
+    private Double latitude;
+    private Double longitude;
 }

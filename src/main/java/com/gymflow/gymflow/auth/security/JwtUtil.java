@@ -48,13 +48,26 @@ public class JwtUtil {
     }
 
     public boolean validateToken(String token) {
+
         try {
+
             Jwts.parser()
                     .verifyWith(getSigningKey())
                     .build()
                     .parseSignedClaims(token);
+
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
+
+        } catch (ExpiredJwtException ex) {
+
+            return false;
+
+        } catch (JwtException ex) {
+
+            return false;
+
+        } catch (IllegalArgumentException ex) {
+
             return false;
         }
     }

@@ -246,6 +246,8 @@ public class AuthServiceImpl implements AuthService {
                         .logoUrl(owner.getGym().getLogoUrl())
                         .description(owner.getGym().getDescription())
                         .establishedYear(owner.getGym().getEstablishedYear())
+                        .latitude(owner.getGym().getLatitude())
+                        .longitude(owner.getGym().getLongitude())
                         .build())
                 .build();
     }

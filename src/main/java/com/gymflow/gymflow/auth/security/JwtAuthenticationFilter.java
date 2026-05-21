@@ -1,11 +1,12 @@
 package com.gymflow.gymflow.auth.security;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,57 +16,215 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * JWT Authentication filter that validates tokens and sets authentication in the SecurityContext.
- * Uses @Lazy to break circular dependencies with CustomUserDetailsService.
- */
 @Component
+@Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
-
     private final JwtUtil jwtUtil;
+
     private final CustomUserDetailsService userDetailsService;
 
-    /**
-     * Manual constructor to apply @Lazy to the UserDetailsService.
-     * This prevents Spring from trying to initialize the entire DB/JPA layer
-     * before the Security Filter chain is ready.
-     */
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, @Lazy CustomUserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(
+            JwtUtil jwtUtil,
+            @Lazy CustomUserDetailsService userDetailsService
+    ) {
+
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain)
-            throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
+        String path = request.getServletPath();
 
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
+        log.info("Incoming Request Path -> {}", path);
 
-            try {
-                if (jwtUtil.validateToken(token)) {
-                    String email = jwtUtil.extractEmail(token);
-                    var userDetails = userDetailsService.loadUserByUsername(email);
+        // =====================================================
+        // SKIP JWT FOR PUBLIC ROUTES
+        // =====================================================
 
-                    var authentication = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
+        if (
+                path.startsWith("/api/auth/") ||
+                        path.equals("/api/members/join") ||
+                        path.startsWith("/api/gyms/public/") ||
+                        path.startsWith("/api/attendance/scan/") ||
+                        path.equals("/api/attendance/toggle") ||
+                        path.startsWith("/api/dashboard/") ||
+                        path.startsWith("/v3/api-docs") ||
+                        path.startsWith("/swagger-ui") ||
+                        path.startsWith("/webjars")
+        ) {
 
-                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
+            log.info(
+                    "Skipping JWT authentication for public route -> {}",
+                    path
+            );
 
-                    log.info("JWT validated successfully for email={}", email);
-                } else {
-                    log.warn("Invalid JWT token received");
-                }
-            } catch (Exception e) {
-                log.error("Could not set user authentication in security context", e);
+            filterChain.doFilter(request, response);
+
+            return;
+        }
+
+        // =====================================================
+        // EXTRACT AUTH HEADER
+        // =====================================================
+
+        final String authHeader =
+                request.getHeader("Authorization");
+
+        // =====================================================
+        // NO AUTH HEADER
+        // =====================================================
+
+        if (
+                authHeader == null ||
+                        !authHeader.startsWith("Bearer ")
+        ) {
+
+            log.warn(
+                    "No Authorization header found for protected route -> {}",
+                    path
+            );
+
+            filterChain.doFilter(request, response);
+
+            return;
+        }
+
+        // =====================================================
+        // EXTRACT TOKEN
+        // =====================================================
+
+        final String jwtToken =
+                authHeader.substring(7);
+
+        try {
+
+            // =====================================================
+            // VALIDATE TOKEN
+            // =====================================================
+
+            if (!jwtUtil.validateToken(jwtToken)) {
+
+                log.warn("JWT validation failed");
+
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+                response.setContentType("application/json");
+
+                response.getWriter().write("""
+                        {
+                            "success": false,
+                            "message": "Invalid JWT token."
+                        }
+                        """);
+
+                return;
             }
+
+            // =====================================================
+            // EXTRACT EMAIL
+            // =====================================================
+
+            String email = jwtUtil.extractEmail(jwtToken);
+
+            log.info("JWT email extracted -> {}", email);
+
+            // =====================================================
+            // AUTHENTICATION NOT SET
+            // =====================================================
+
+            if (
+                    email != null &&
+                            SecurityContextHolder
+                                    .getContext()
+                                    .getAuthentication() == null
+            ) {
+
+                var userDetails =
+                        userDetailsService
+                                .loadUserByUsername(email);
+
+                var authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                authentication.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request)
+                );
+
+                SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(authentication);
+
+                log.info(
+                        "JWT authentication success for -> {}",
+                        email
+                );
+            }
+
+        } catch (ExpiredJwtException ex) {
+
+            log.error("JWT token expired -> {}", ex.getMessage());
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+            response.setContentType("application/json");
+
+            response.getWriter().write("""
+                    {
+                        "success": false,
+                        "message": "JWT token expired."
+                    }
+                    """);
+
+            return;
+
+        } catch (JwtException ex) {
+
+            log.error("JWT exception -> {}", ex.getMessage());
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+            response.setContentType("application/json");
+
+            response.getWriter().write("""
+                    {
+                        "success": false,
+                        "message": "Invalid JWT token."
+                    }
+                    """);
+
+            return;
+
+        } catch (Exception ex) {
+
+            log.error(
+                    "Could not authenticate JWT user",
+                    ex
+            );
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+            response.setContentType("application/json");
+
+            response.getWriter().write("""
+                    {
+                        "success": false,
+                        "message": "Authentication failed."
+                    }
+                    """);
+
+            return;
         }
 
         filterChain.doFilter(request, response);
