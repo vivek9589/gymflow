@@ -34,6 +34,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // hooks in CORS rules
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers(
                                 // 🚀 1. Permit Frontend Router Entry Routes
                                 "/",
@@ -49,6 +50,7 @@ public class SecurityConfig {
                                 "/api/attendance/scan/**",
                                 "/api/attendance/toggle",
                                 "/api/dashboard/**",
+
 
                                 // 🚀 3. API Documentation & Swagger UI Resources
                                 "/v3/api-docs/**",
