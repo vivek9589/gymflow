@@ -35,12 +35,14 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        // 🚀 Allow absolute matching for actuator paths explicitly
+                        // 1. Production Monitoring & Diagnostics
                         .requestMatchers("/actuator", "/actuator/**").permitAll()
 
-                        // Public API Endpoints
+                        // 2. Open / Public Guest Routes
                         .requestMatchers(
-                                "/api/auth/**",
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/refresh",
                                 "/api/members/join",
                                 "/api/gyms/public/**",
                                 "/api/attendance/scan/**",
@@ -48,7 +50,7 @@ public class SecurityConfig {
                                 "/api/dashboard/**"
                         ).permitAll()
 
-                        // API Documentation & Swagger UI Resources
+                        // 3. API Open Documentation Engine
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
@@ -56,9 +58,9 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
 
+                        // 4. Secure Account Routes (This intercepts /api/auth/profile safely)
                         .anyRequest().authenticated()
-                )
-                .exceptionHandling(exception -> exception
+                )                .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             log.warn("Unauthorized access attempt on path: {}", request.getRequestURI());
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);

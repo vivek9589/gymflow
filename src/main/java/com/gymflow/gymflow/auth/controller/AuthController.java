@@ -69,9 +69,18 @@ public class AuthController {
 
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<ProfileResponseDTO>> getProfile(Authentication authentication) {
+        // 🟢 Industry Standard: Defensive validation against anonymous/null authentication context
+        if (authentication == null || !authentication.isAuthenticated()) {
+            log.warn("Unauthorized profile access attempt intercepted.");
+            throw new org.springframework.security.authentication.InsufficientAuthenticationException("User is not authenticated.");
+        }
+
         String email = authentication.getName();
+        log.info("Initiating profile fetch request for user email={}", email);
+
         ProfileResponseDTO profile = authService.getProfile(email);
-        log.info("Profile fetched successfully for email={}", email);
+
+        log.info("Profile dataset compiled successfully for user email={}", email);
         return ResponseEntity.ok(ApiResponse.success(profile, "Profile fetched successfully."));
     }
 

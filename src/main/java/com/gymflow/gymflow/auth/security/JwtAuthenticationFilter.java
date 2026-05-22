@@ -40,13 +40,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getServletPath();
 
-        boolean skip = path.startsWith("/api/auth/") ||
+        // 🟢 INDUSTRY STANDARD: Only bypass explicit public operational endpoints
+        boolean skip = path.equals("/api/auth/login") ||
+                path.equals("/api/auth/register") ||
+                path.equals("/api/auth/refresh") ||
                 path.equals("/api/members/join") ||
                 path.startsWith("/api/gyms/public/") ||
                 path.startsWith("/api/attendance/scan/") ||
                 path.equals("/api/attendance/toggle") ||
                 path.startsWith("/api/dashboard/") ||
-                path.startsWith("/actuator") ||          // Allows Docker health checks to pass cleanly
+                path.startsWith("/actuator") ||
                 path.startsWith("/v3/api-docs") ||
                 path.startsWith("/swagger-ui") ||
                 path.startsWith("/webjars");

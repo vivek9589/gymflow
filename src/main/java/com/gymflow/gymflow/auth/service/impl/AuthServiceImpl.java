@@ -223,9 +223,30 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional(readOnly = true)
     public ProfileResponseDTO getProfile(String email) {
+        // 🟢 Step 1: Securely locate the user context or fire a clean global exception match
         GymOwner owner = authRepository.findByEmail(email)
                 .orElseThrow(() -> new UserNotFoundException(email));
 
+        // 🟢 Step 2: Extract and map the Gym entity safely, mitigating NullPointerExceptions if a gym profile isn't fully initialized yet
+        GymResponseDTO gymDto = java.util.Optional.ofNullable(owner.getGym())
+                .map(gym -> GymResponseDTO.builder()
+                        .id(gym.getId())
+                        .name(gym.getName())
+                        .address(gym.getAddress())
+                        .contactNumber(gym.getContactNumber())
+                        .city(gym.getCity())
+                        .state(gym.getState())
+                        .pincode(gym.getPincode())
+                        .website(gym.getWebsite())
+                        .logoUrl(gym.getLogoUrl())
+                        .description(gym.getDescription())
+                        .establishedYear(gym.getEstablishedYear())
+                        .latitude(gym.getLatitude())
+                        .longitude(gym.getLongitude())
+                        .build())
+                .orElse(null); // Yields clean null fields gracefully back to the UI state rather than a 500 error cascade
+
+        // 🟢 Step 3: Build the global corporate-tier unified payload envelope
         return ProfileResponseDTO.builder()
                 .id(owner.getId())
                 .ownerName(owner.getOwnerName())
@@ -233,24 +254,10 @@ public class AuthServiceImpl implements AuthService {
                 .role(owner.getRole().name())
                 .createdAt(owner.getCreatedAt())
                 .updatedAt(owner.getUpdatedAt())
-                .gym(GymResponseDTO.builder()
-                        .id(owner.getGym().getId())
-                        .name(owner.getGym().getName())
-                        //.gymCode(owner.getGym().getGymCode())
-                        .address(owner.getGym().getAddress())
-                        .contactNumber(owner.getGym().getContactNumber())
-                        .city(owner.getGym().getCity())
-                        .state(owner.getGym().getState())
-                        .pincode(owner.getGym().getPincode())
-                        .website(owner.getGym().getWebsite())
-                        .logoUrl(owner.getGym().getLogoUrl())
-                        .description(owner.getGym().getDescription())
-                        .establishedYear(owner.getGym().getEstablishedYear())
-                        .latitude(owner.getGym().getLatitude())
-                        .longitude(owner.getGym().getLongitude())
-                        .build())
+                .gym(gymDto)
                 .build();
     }
+
 
     @Override
     @Transactional
