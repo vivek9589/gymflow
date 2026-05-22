@@ -1,6 +1,7 @@
 package com.gymflow.gymflow.config;
 
 import com.gymflow.gymflow.auth.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,37 +29,42 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        log.info("Initializing SecurityFilterChain configuration");
+        log.info("Initializing Pure REST API SecurityFilterChain configuration");
 
         http
                 .csrf(csrf -> csrf.disable())
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // hooks in CORS rules
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers(
-                                // 🚀 1. Permit Frontend Router Entry Routes
-                                "/",
-                                "/reset-password",
-                                "/index.html",
-                                "/assets/**",
-                                "/favicon.ico",
 
-                                // 🚀 2. Public API Endpoints (Fixed missing leading slashes)
+                        // 🚀 1. Public API Endpoints Only (Frontend static routes removed)
+                        .requestMatchers(
                                 "/api/auth/**",
                                 "/api/members/join",
                                 "/api/gyms/public/**",
                                 "/api/attendance/scan/**",
                                 "/api/attendance/toggle",
-                                "/api/dashboard/**",
+                                "/api/dashboard/**"
+                        ).permitAll()
 
-
-                                // 🚀 3. API Documentation & Swagger UI Resources
+                        // 🚀 2. API Documentation & Swagger UI Resources
+                        .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/webjars/**"
                         ).permitAll()
+
                         .anyRequest().authenticated()
+                )
+                // 🚀 3. Explicit Entry Point to avoid default forward-to-html behaviors on failure
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            log.warn("Unauthorized access attempt on path: {}", request.getRequestURI());
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"success\": false, \"message\": \"Unauthorized: Missing or invalid token.\"}");
+                        })
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
@@ -70,37 +76,24 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-
         CorsConfiguration configuration = new CorsConfiguration();
 
+        // 🟢 Make sure ALL your deployed Vercel and DuckDNS domains are registered here
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://localhost:3000",
-                "https://fitness-zen-desk.vercel.app"
+                "https://fitness-zen-desk.vercel.app",
+                "https://gymflow.duckdns.org"
         ));
 
-        configuration.setAllowedMethods(List.of(
-                "GET",
-                "POST",
-                "PUT",
-                "PATCH",
-                "DELETE",
-                "OPTIONS"
-        ));
-
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-
         configuration.setExposedHeaders(List.of("Authorization"));
-
         configuration.setAllowCredentials(true);
-
         configuration.setMaxAge(3600L);
 
-        UrlBasedCorsConfigurationSource source =
-                new UrlBasedCorsConfigurationSource();
-
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
-
         return source;
     }
 }
