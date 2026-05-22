@@ -35,9 +35,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/actuator/**").permitAll()
+                        // 🚀 Allow absolute matching for actuator paths explicitly
+                        .requestMatchers("/actuator", "/actuator/**").permitAll()
 
-                        // 🚀 1. Public API Endpoints Only (Frontend static routes removed)
+                        // Public API Endpoints
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/api/members/join",
@@ -47,7 +48,7 @@ public class SecurityConfig {
                                 "/api/dashboard/**"
                         ).permitAll()
 
-                        // 🚀 2. API Documentation & Swagger UI Resources
+                        // API Documentation & Swagger UI Resources
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
@@ -57,7 +58,6 @@ public class SecurityConfig {
 
                         .anyRequest().authenticated()
                 )
-                // 🚀 3. Explicit Entry Point to avoid default forward-to-html behaviors on failure
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
                             log.warn("Unauthorized access attempt on path: {}", request.getRequestURI());
@@ -78,7 +78,6 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 🟢 Make sure ALL your deployed Vercel and DuckDNS domains are registered here
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
                 "http://localhost:3000",
