@@ -1,6 +1,7 @@
 package com.gymflow.gymflow.payment.service.impl;
 
 
+import com.gymflow.gymflow.member.dto.response.PaymentHistoryDTO;
 import com.gymflow.gymflow.payment.entity.Payment;
 import com.gymflow.gymflow.payment.entity.Subscription;
 import com.gymflow.gymflow.payment.repository.PaymentRepository;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -47,5 +49,12 @@ public class PaymentServiceImpl implements PaymentService {
 
         log.info("Payment saved successfully. Subscription {} is now fully ACTIVE", subscriptionId);
         return savedPayment;
+    }
+
+
+    @Override
+    public List<Payment> getPaymentsForMember(Long memberId) {
+        log.info("Fetching payment history for memberId={}", memberId);
+        return paymentRepository.findByMemberIdOrderByCreatedAtDesc(memberId);
     }
 }

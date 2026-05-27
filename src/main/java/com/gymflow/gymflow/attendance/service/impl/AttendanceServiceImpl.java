@@ -102,10 +102,10 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     public long getActiveCount(Long gymId) {
         log.info("Fetching active count for gymId={}", gymId);
-        // PERFORMANCE IMPROVEMENT: Replace the old in-memory Java stream filter with a direct DB count
-        // Old: attendanceRepository.findByGymIdOrderByCheckInTimeDesc(gymId).stream().filter(...)
-        return attendanceRepository.countByGymIdAndCheckOutTimeIsNull(gymId);
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        return attendanceRepository.countByGymIdAndCheckOutTimeIsNullAndCheckInTimeAfter(gymId, startOfToday);
     }
+
 
     @Override
     public List<Attendance> findByMemberIdOrderByCheckInTimeDesc(Long memberId) {

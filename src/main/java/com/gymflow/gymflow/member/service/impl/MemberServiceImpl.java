@@ -9,6 +9,9 @@ import com.gymflow.gymflow.gym.repository.GymRepository;
 import com.gymflow.gymflow.member.dto.request.MemberJoinRequest;
 import com.gymflow.gymflow.member.dto.request.MemberUpdateRequest;
 import com.gymflow.gymflow.member.dto.response.MemberResponse;
+import com.gymflow.gymflow.member.dto.response.PaymentHistoryDTO;
+import com.gymflow.gymflow.member.dto.response.RenewalOptionDTO;
+import com.gymflow.gymflow.member.dto.response.SubscriptionHistoryDTO;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.member.service.MemberService;
@@ -168,29 +171,32 @@ public class MemberServiceImpl implements MemberService {
                                   BigDecimal amountPaid,
                                   String paymentMode,
                                   String transactionRef) {
+        log.info("Renewing subscription for memberId={} planId={}", memberId, planId);
 
-        log.info("Processing simplified subscription renewal transaction for memberId: {}", memberId);
-
-        // Fetch core dependencies
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("Member not found"));
 
         Plan plan = planRepository.findById(planId)
                 .orElseThrow(() -> new PlanNotFoundException("Plan not found"));
 
-        // Binary check: Resolve if the registration renewal is fully paid or waiting for gateway authorization
+        // Early renewal date calculation logic
+        LocalDate baseStartDate = LocalDate.now();
+        if (member.getExpiryDate() != null && member.getExpiryDate().isAfter(LocalDate.now())) {
+            baseStartDate = member.getExpiryDate();
+        }
+
         boolean isPaid = (amountPaid != null && amountPaid.compareTo(BigDecimal.ZERO) > 0);
 
-        // STEP 1: Create NEW flat subscription container (Binary ACTIVE/PENDING state, no split-payments)
-        var subscription = subscriptionService.createSubscription(
+        // Create new subscription record tracking
+        Subscription subscription = subscriptionService.createSubscription(
                 memberId,
                 planId,
                 member.getGym().getId(),
                 isPaid,
-                LocalDate.now() // Explicitly setting current date as start context for renewal
+                baseStartDate
         );
 
-        // STEP 2: Record upfront full payment ledger if applicable
+        // Record transaction statement history log
         if (isPaid) {
             paymentService.addPayment(
                     memberId,
@@ -202,15 +208,16 @@ public class MemberServiceImpl implements MemberService {
             );
         }
 
-        // STEP 3: Synchronize member snapshot fields with the new active subscription state
+        // Update entity database state variables
         member.setCurrentPlan(plan);
         member.setSubscriptionStartDate(subscription.getStartDate());
         member.setExpiryDate(subscription.getEndDate());
-        member.setStatus(subscription.getStatus()); // Will cleanly match subscription's ACTIVE or PENDING state
+        member.setStatus(subscription.getStatus());
 
         memberRepository.save(member);
 
-        log.info("Membership renewed successfully with status '{}' for memberId={}", subscription.getStatus(), memberId);
+        log.info("Renewal complete for memberId={} newExpiry={}", memberId, subscription.getEndDate());
+        // No return statement here, method safely terminates execution frame
     }
 
 
@@ -272,15 +279,87 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    @Transactional(readOnly = true) // Keeps Hibernate session open to map lazy-loaded data safely
+    @Transactional(readOnly = true)
     public MemberResponse getMemberById(Long id) {
-        log.info("Fetching member profile details for id: {}", id);
+        log.info("Fetching member profile for id={}", id);
 
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new MemberNotFoundException("Member not found with id: " + id));
 
-        return mapToResponse(member);
+        // Fetch raw payments and map to DTO
+        List<PaymentHistoryDTO> history = paymentService.getPaymentsForMember(member.getId())
+                .stream()
+                .map(p -> PaymentHistoryDTO.builder()
+                        .id(p.getId())
+                        .amount(p.getAmount())
+                        .paymentMode(p.getPaymentMode())
+                        .status(p.getStatus())
+                        .transactionRef(p.getTransactionRef())
+                        .createdAt(p.getCreatedAt())
+                        .build())
+                .toList();
+
+        // 1. Fetch the subscription records from the database
+        List<Subscription> subscriptions = subscriptionService.getSubscriptionsForMember(member.getId());
+
+// 2. Map them cleanly to your DTO by looking up the plan names on the fly
+        List<SubscriptionHistoryDTO> planHistory = subscriptions.stream()
+                .map(s -> {
+                    // Find the plan name by its ID, fallback to "Unknown Plan" if it can't be found
+                    String actualPlanName = planRepository.findById(s.getPlanId())
+                            .map(Plan::getName)
+                            .orElse("Unknown Plan");
+
+                    return SubscriptionHistoryDTO.builder()
+                            .planName(actualPlanName) // Cleanly resolved plan name string
+                            .startDate(s.getStartDate())
+                            .endDate(s.getEndDate())
+                            .status(s.getStatus())
+                            .build();
+                })
+                .toList();
+
+        // Build renewal options from PlanRepository
+        List<RenewalOptionDTO> renewalOptions = planRepository.findByGymId(member.getGym().getId())
+                .stream()
+                .filter(Plan::isActive)
+                .map(plan -> RenewalOptionDTO.builder()
+                        .planId(plan.getId())
+                        .name(plan.getName())
+                        .price(plan.getPrice())
+                        .durationInDays(plan.getDurationInDays())
+                        .build())
+                .toList();
+
+        return MemberResponse.builder()
+                .id(member.getId())
+                .name(member.getName())
+                .phone(member.getPhone())
+                .email(member.getEmail())
+                .bloodGroup(member.getBloodGroup())
+                .weight(member.getWeight())
+                .height(member.getHeight())
+                .occupation(member.getOccupation())
+                .permanentAddress(member.getPermanentAddress())
+                .medicalConditions(member.getMedicalConditions())
+                .status(member.getStatus())
+                .registrationDate(member.getRegistrationDate())
+                .expiryDate(member.getExpiryDate())
+                .initialPayment(member.getInitialPayment())
+                .planName(member.getCurrentPlan() != null ? member.getCurrentPlan().getName() : "No Active Plan")
+                .checkInToken(member.getCheckInToken())
+                .nextDueDate(member.getExpiryDate())
+                // keep digital access pass link if required
+               //.digitalAccessPassLink("https://gymflow.com/access/" + member.getCheckInToken())
+                .paymentHistory(history)
+                .planHistory(planHistory)
+                .renewalOptions(renewalOptions)
+                .build();
     }
+
+
+
+
     @Override
     public List<Member> searchMembers(Long gymId, String query) {
         log.info("Searching members in gymId: {} with query: {}", gymId, query);

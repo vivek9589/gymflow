@@ -59,6 +59,9 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
 
 
+    long countByGymIdAndCheckOutTimeIsNullAndCheckInTimeAfter(Long gymId, LocalDateTime startOfDay);
+
+
 
 
 }
