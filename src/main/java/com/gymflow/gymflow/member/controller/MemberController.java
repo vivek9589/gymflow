@@ -54,7 +54,7 @@ public class MemberController {
         memberService.renewSubscription(
                 request.getMemberId(),
                 request.getPlanId(),
-                request.getAmountPaid(), // Now cleanly passes as BigDecimal
+                request.getAmountPaid(),
                 request.getPaymentMode(),
                 request.getTransactionRef()
         );
@@ -63,6 +63,7 @@ public class MemberController {
                 ApiResponse.success(null, "Membership renewed successfully")
         );
     }
+
 
     /**
      * Protected endpoint: Fetch all members of a gym.
@@ -125,9 +126,9 @@ public class MemberController {
     public ResponseEntity<ApiResponse<MemberResponse>> getMemberById(@PathVariable Long id) {
         log.info("REST request to fetch member profile for id: {}", id);
 
-        // Service securely fetches and handles mapping entirely internally
         MemberResponse response = memberService.getMemberById(id);
 
         return ResponseEntity.ok(ApiResponse.success(response, "Member fetched successfully"));
     }
+
 }

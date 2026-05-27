@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -43,5 +44,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 .build();
 
         return subscriptionRepository.save(subscription);
+    }
+
+    @Override
+    public List<Subscription> getSubscriptionsForMember(Long memberId) {
+        log.info("Fetching subscription history logs for memberId: {}", memberId);
+
+        // Fetches all plan logs linked to the member id from the database
+        return subscriptionRepository.findByMemberIdOrderByStartDateDesc(memberId);
     }
 }
