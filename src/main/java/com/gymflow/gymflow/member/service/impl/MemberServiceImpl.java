@@ -58,21 +58,26 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public MemberResponse registerMember(MemberJoinRequest request) {
-        log.info("Processing flat billing registration for gym Id: {}", request.getGymId());
+        log.info("Processing multi-tenant registration for gym Id: {}", request.getGymId());
 
+        // 1. Strict SaaS Boundary Isolation
         Gym gym = gymRepository.findById(request.getGymId())
                 .orElseThrow(() -> new GymNotFoundException("Invalid Gym ID: " + request.getGymId()));
 
         Plan plan = planRepository.findById(request.getPlanId())
-                .orElseThrow(() -> new PlanNotFoundException("Selected plan not found"));
+                .orElseThrow(() -> new PlanNotFoundException("Selected pricing plan not found"));
 
-        LocalDate start = (request.getStartDate() != null) ? request.getStartDate() : LocalDate.now();
+        if (!plan.getGym().getId().equals(gym.getId())) {
+            throw new IllegalArgumentException("Cross-tenant violation: Selected plan does not belong to this gym.");
+        }
 
-        // Calculate binary verification status from both incoming request modes
+        // 2. Resolve Payment Criteria
         boolean isPaid = request.isPaid() ||
                 (request.getInitialPayment() != null && request.getInitialPayment().compareTo(BigDecimal.ZERO) > 0);
 
-        // 1. Persist new athlete entity mapping access lifecycle flag
+        LocalDate alignmentStartDate = (request.getStartDate() != null) ? request.getStartDate() : LocalDate.now();
+
+        // 3. Persist core Identity Pass (Attendance Token mapping)
         Member member = Member.builder()
                 .name(request.getName())
                 .phone(request.getPhone())
@@ -85,62 +90,49 @@ public class MemberServiceImpl implements MemberService {
                 .fatherName(request.getFatherName())
                 .permanentAddress(request.getPermanentAddress())
                 .medicalConditions(request.getMedicalConditions())
-                .initialPayment(request.getInitialPayment()) // Populated missing mapping field
+                .initialPayment(request.getInitialPayment() != null ? request.getInitialPayment() : BigDecimal.ZERO)
                 .gym(gym)
-                .registrationDate(LocalDate.now()) // Safe fallback value before Hibernate transaction commits
-                .status(isPaid ? "ACTIVE" : "PENDING")
-                .checkInToken(java.util.UUID.randomUUID().toString())
+                .registrationDate(LocalDate.now())
+                .status(isPaid ? "ACTIVE" : "PENDING") // Attendance-gated starting status
+                .checkInToken(java.util.UUID.randomUUID().toString()) // Unique hardware access key
                 .build();
 
         Member savedMember = memberRepository.save(member);
 
-        // 2. Build Unsplitted Flat Subscription
+        // 4. Bind the Subscription Contract Lifecycle
         Subscription subscription = subscriptionService.createSubscription(
-                savedMember.getId(),
-                plan.getId(),
-                gym.getId(),
-                isPaid,
-                start
+                savedMember.getId(), plan.getId(), gym.getId(), isPaid, alignmentStartDate
         );
 
-        // 3. Create full upfront transaction ledger if paid tracking criteria evaluates to true
+        // 5. Fire Independent Transaction Ledger
         if (isPaid) {
             BigDecimal paymentAmount = (request.getInitialPayment() != null && request.getInitialPayment().compareTo(BigDecimal.ZERO) > 0)
                     ? request.getInitialPayment()
                     : plan.getPrice();
 
             paymentService.addPayment(
-                    savedMember.getId(),
-                    subscription.getId(),
-                    gym.getId(),
-                    paymentAmount,
-                    request.getPaymentMode(),
-                    request.getTransactionRef()
+                    savedMember.getId(), subscription.getId(), gym.getId(),
+                    paymentAmount, request.getPaymentMode(), request.getTransactionRef()
             );
         }
 
-        // 4. Update core status and caching snapshots
+        // 6. Synchronize snapshots onto Member for sub-millisecond Attendance Check-Ins
         savedMember.setCurrentPlan(plan);
         savedMember.setSubscriptionStartDate(subscription.getStartDate());
         savedMember.setExpiryDate(subscription.getEndDate());
-        savedMember.setStatus(subscription.getStatus());
+        savedMember.setStatus(subscription.getStatus()); // Synchronized cleanly from contract state
 
-        // Using saveAndFlush forces Hibernate to sync timestamps with the database immediately
-        Member finalSavedMember = memberRepository.saveAndFlush(savedMember);
-
-        log.info("Streamlined member registration cycle complete for system ID: {}", finalSavedMember.getId());
-
-        // 5. Fire notifications context safely
+        // 7. Guarded Event Bus Notifications
         try {
-            if ("ACTIVE".equals(finalSavedMember.getStatus())) {
+            if ("ACTIVE".equals(savedMember.getStatus())) {
                 notificationTemplateRepository.findByName("WELCOME")
-                        .ifPresent(template -> notificationService.sendNotification(finalSavedMember.getId(), template.getId()));
+                        .ifPresent(template -> notificationService.sendNotification(savedMember.getId(), template.getId()));
             }
         } catch (Exception e) {
-            log.error("Guarded welcome message thread dispatch failure for ID: {}", finalSavedMember.getId(), e);
+            log.error("Guarded background message failure for customer: {}", savedMember.getId(), e);
         }
 
-        return convertToMemberResponse(finalSavedMember);
+        return mapToResponse(savedMember);
     }
 
     private MemberResponse convertToMemberResponse(Member member) {
@@ -171,55 +163,51 @@ public class MemberServiceImpl implements MemberService {
                                   BigDecimal amountPaid,
                                   String paymentMode,
                                   String transactionRef) {
-        log.info("Renewing subscription for memberId={} planId={}", memberId, planId);
+        log.info("Processing SaaS subscription renewal for memberId={} planId={}", memberId, planId);
 
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("Member not found"));
 
         Plan plan = planRepository.findById(planId)
-                .orElseThrow(() -> new PlanNotFoundException("Plan not found"));
+                .orElseThrow(() -> new PlanNotFoundException("Selected renewal plan not found"));
 
-        // Early renewal date calculation logic
+        // Tenant Check Guard
+        if (!plan.getGym().getId().equals(member.getGym().getId())) {
+            throw new IllegalArgumentException("Cross-tenant violation: Plan does not match member gym footprint.");
+        }
+
+        // 1. Calculate base date window (Seamless uninterrupted renewal timeline)
         LocalDate baseStartDate = LocalDate.now();
         if (member.getExpiryDate() != null && member.getExpiryDate().isAfter(LocalDate.now())) {
-            baseStartDate = member.getExpiryDate();
+            baseStartDate = member.getExpiryDate(); // Extends from current expiry seamlessly
         }
 
         boolean isPaid = (amountPaid != null && amountPaid.compareTo(BigDecimal.ZERO) > 0);
 
-        // Create new subscription record tracking
+        // 2. Generate new Subscription Instance contract
         Subscription subscription = subscriptionService.createSubscription(
-                memberId,
-                planId,
-                member.getGym().getId(),
-                isPaid,
-                baseStartDate
+                memberId, planId, member.getGym().getId(), isPaid, baseStartDate
         );
 
-        // Record transaction statement history log
+        // 3. Log financial event into Ledger (This ensures your dashboard updates cleanly!)
         if (isPaid) {
             paymentService.addPayment(
-                    memberId,
-                    subscription.getId(),
-                    member.getGym().getId(),
-                    amountPaid,
-                    paymentMode,
-                    transactionRef
+                    memberId, subscription.getId(), member.getGym().getId(),
+                    amountPaid, paymentMode, transactionRef
             );
         }
 
-        // Update entity database state variables
+        // 4. Update access control points back onto Member record
         member.setCurrentPlan(plan);
         member.setSubscriptionStartDate(subscription.getStartDate());
         member.setExpiryDate(subscription.getEndDate());
+
+        // ATTENDANCE ALIGNED: Maps purely to "ACTIVE" or subscription status ("PENDING" if unpaid).
+        // This allows your attendance hardware/software checks to pass smoothly.
         member.setStatus(subscription.getStatus());
 
-        memberRepository.save(member);
-
-        log.info("Renewal complete for memberId={} newExpiry={}", memberId, subscription.getEndDate());
-        // No return statement here, method safely terminates execution frame
+        log.info("SaaS renewal processed. Access granted through state: {} until: {}", member.getStatus(), member.getExpiryDate());
     }
-
 
     @Override
     public Page<Member> getAllMembersByGym(Long gymId, int page, int size, String status, String search, String planName) {
