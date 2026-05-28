@@ -7,6 +7,8 @@ import com.gymflow.gymflow.gym.repository.GymRepository;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.dashboard.service.DashboardService;
+import com.gymflow.gymflow.payment.entity.Payment;
+import com.gymflow.gymflow.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -17,13 +19,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Service implementation for dashboard statistics.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -32,13 +34,13 @@ public class DashboardServiceImpl implements DashboardService {
     private final MemberRepository memberRepository;
     private final GymRepository gymRepository;
     private final AttendanceRepository attendanceRepository;
+    private final PaymentRepository paymentRepository; // Injected Ledger Repository
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public DashboardStatsDTO getDashboardStats(Long gymId) {
-        log.info("Fetching dashboard stats for gymId={}", gymId);
+        log.info("Fetching transactionally accurate dashboard stats for gymId={}", gymId);
 
-        // Validate gym existence
         gymRepository.findById(gymId)
                 .orElseThrow(() -> new GymNotFoundException("Gym not found with id: " + gymId));
 
@@ -59,33 +61,46 @@ public class DashboardServiceImpl implements DashboardService {
                         .build())
                 .toList();
 
-        // 3. Revenue this month (Includes deleted members for financial accuracy)
-        BigDecimal revenue = memberRepository.calculateMonthlyRevenue(gymId, LocalDate.now().getMonthValue());
+        // 3. Date boundary ranges for this month vs last month
+        LocalDate todayDate = LocalDate.now();
+        LocalDateTime currentMonthStart = todayDate.with(TemporalAdjusters.firstDayOfMonth()).atStartOfDay();
+        LocalDateTime currentMonthEnd = todayDate.with(TemporalAdjusters.lastDayOfMonth()).atTime(LocalTime.MAX);
 
-        // 4. Pending payments (Excluding Deleted)
+        LocalDateTime lastMonthStart = todayDate.minusMonths(1).with(TemporalAdjusters.firstDayOfMonth()).atStartOfDay();
+        LocalDateTime lastMonthEnd = todayDate.minusMonths(1).with(TemporalAdjusters.lastDayOfMonth()).atTime(LocalTime.MAX);
+
+        // 4. Ledger-derived aggregate monthly revenue
+        BigDecimal revenue = paymentRepository.calculateRevenueForPeriod(gymId, currentMonthStart, currentMonthEnd);
+
+        // 5. Pending payments calculation using transactional ledger values
         List<Member> activeGymMembers = memberRepository.findByGymIdAndDeletedFalse(gymId);
 
-        BigDecimal pending = activeGymMembers.stream()
-                .filter(m -> m.getCurrentPlan() != null)
-                .map(m -> {
-                    BigDecimal planPrice = m.getCurrentPlan().getPrice();
-                    // Directly fallback to BigDecimal.ZERO since m.getInitialPayment() is now a BigDecimal
-                    BigDecimal paid = m.getInitialPayment() != null ? m.getInitialPayment() : BigDecimal.ZERO;
-                    BigDecimal balance = planPrice.subtract(paid);
-                    return balance.compareTo(BigDecimal.ZERO) > 0 ? balance : BigDecimal.ZERO;
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal pending = BigDecimal.ZERO;
+        int pendingCount = 0;
 
-        int pendingCount = (int) activeGymMembers.stream()
-                .filter(m -> m.getCurrentPlan() != null)
-                .filter(m -> {
-                    BigDecimal planPrice = m.getCurrentPlan().getPrice();
-                    BigDecimal paid = m.getInitialPayment() != null ? m.getInitialPayment() : BigDecimal.ZERO;
-                    return planPrice.subtract(paid).compareTo(BigDecimal.ZERO) > 0;
-                })
-                .count();
+        for (Member m : activeGymMembers) {
+            if (m.getCurrentPlan() != null && m.getSubscriptionStartDate() != null) {
+                BigDecimal planPrice = m.getCurrentPlan().getPrice();
 
-        // 5. Expiring soon (next 7 days - Excluding Deleted)
+                // Fetch payments registered for this member's current active plan window
+                LocalDateTime cycleStart = m.getSubscriptionStartDate().atStartOfDay();
+
+                List<Payment> cyclePayments = paymentRepository.findByMemberId(m.getId());
+                BigDecimal totalPaidInCycle = cyclePayments.stream()
+                        .filter(p -> "SUCCESS".equalsIgnoreCase(p.getStatus()))
+                        .filter(p -> !p.getCreatedAt().isBefore(cycleStart))
+                        .map(Payment::getAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                BigDecimal balance = planPrice.subtract(totalPaidInCycle);
+                if (balance.compareTo(BigDecimal.ZERO) > 0) {
+                    pending = pending.add(balance);
+                    pendingCount++;
+                }
+            }
+        }
+
+        // 6. Expiring soon (next 7 days)
         LocalDate today = LocalDate.now();
         LocalDate nextWeek = today.plusDays(7);
         List<Member> expiringSoonMembers = memberRepository
@@ -104,32 +119,30 @@ public class DashboardServiceImpl implements DashboardService {
                         .planName(m.getCurrentPlan() != null ? m.getCurrentPlan().getName() : "N/A")
                         .expiryDate(m.getExpiryDate() != null ? m.getExpiryDate().toString() : "N/A")
                         .status(m.getStatus())
-                        .daysLeft(m.getExpiryDate() != null ?
-                                ChronoUnit.DAYS.between(LocalDate.now(), m.getExpiryDate()) : 0)
+                        .daysLeft(m.getExpiryDate() != null ? ChronoUnit.DAYS.between(LocalDate.now(), m.getExpiryDate()) : 0)
                         .build())
                 .toList();
 
         ExpiringSoonDTO expiringSoon = new ExpiringSoonDTO(expiringCount, potentialRevenue, expiringSoonDTOs);
 
-
-        // 6. Popular plan (Excluding Deleted)
+        // 7. Popular plan (Excluding Deleted)
         PopularPlanDTO popularPlan = memberRepository.findPopularPlans(gymId, PageRequest.of(0, 1))
                 .stream()
                 .findFirst()
                 .orElse(new PopularPlanDTO("N/A", 0L));
 
-        // 7. Attendance health (last 7 days)
+        // 8. Attendance health
         LocalDateTime startDate = LocalDate.now().minusDays(7).atStartOfDay();
         int activeThisWeekCount = attendanceRepository.countActiveMembersThisWeek(gymId, startDate);
         int inactiveThisWeek = (int) Math.max(0, active - activeThisWeekCount);
         AttendanceHealthDTO attendanceHealth = new AttendanceHealthDTO(activeThisWeekCount, inactiveThisWeek);
 
-        // 8. Renewal rate (renewed ÷ expired - Excluding Deleted)
+        // 9. Renewal rate
         Long renewedCount = memberRepository.countByGymIdAndStatusAndDeletedFalse(gymId, "RENEWED");
         int renewalRate = expired > 0 ? (int) ((renewedCount * 100.0) / expired) : 0;
 
-        // 9. Revenue growth (Compare current vs last month)
-        BigDecimal lastMonthRevenue = memberRepository.calculateMonthlyRevenue(gymId, LocalDate.now().minusMonths(1).getMonthValue());
+        // 10. Ledger-derived historical growth trends
+        BigDecimal lastMonthRevenue = paymentRepository.calculateRevenueForPeriod(gymId, lastMonthStart, lastMonthEnd);
 
         int revenueGrowth = 0;
         if (lastMonthRevenue != null && lastMonthRevenue.compareTo(BigDecimal.ZERO) > 0) {
