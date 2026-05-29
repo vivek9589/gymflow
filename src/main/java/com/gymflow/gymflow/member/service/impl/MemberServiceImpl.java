@@ -120,16 +120,33 @@ public class MemberServiceImpl implements MemberService {
         savedMember.setCurrentPlan(plan);
         savedMember.setSubscriptionStartDate(subscription.getStartDate());
         savedMember.setExpiryDate(subscription.getEndDate());
-        savedMember.setStatus(subscription.getStatus()); // Synchronized cleanly from contract state
+        savedMember.setStatus(subscription.getStatus());
 
-        // 7. Guarded Event Bus Notifications
-        try {
-            if ("ACTIVE".equals(savedMember.getStatus())) {
-                notificationTemplateRepository.findByName("WELCOME")
-                        .ifPresent(template -> notificationService.sendNotification(savedMember.getId(), template.getId()));
-            }
-        } catch (Exception e) {
-            log.error("Guarded background message failure for customer: {}", savedMember.getId(), e);
+        // 🔥 FIXED: Capture tracking details for safe async closure execution
+        final Long asyncMemberId = savedMember.getId();
+        final String asyncStatus = savedMember.getStatus();
+
+        // 7. Guarded Event Bus Notifications - Asynchronous, Non-Blocking Thread Execution
+        if ("ACTIVE".equals(asyncStatus)) {
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    // Introduce a tiny sleep buffer if needed, or let async threads fetch cleanly
+                    Thread.sleep(300);
+
+                    notificationTemplateRepository.findByName("MEMBER_WELCOME")
+                            .ifPresent(template -> notificationService.sendNotification(asyncMemberId, template.getId()));
+
+                    notificationTemplateRepository.findByName("MEMBER_PLAN_DETAILS")
+                            .ifPresent(template -> notificationService.sendNotification(asyncMemberId, template.getId()));
+
+                    notificationTemplateRepository.findByName("MEMBER_ACCESS_PASS")
+                            .ifPresent(template -> notificationService.sendNotification(asyncMemberId, template.getId()));
+
+                    log.info("Asynchronous multi-message sequence successfully processed for member: {}", asyncMemberId);
+                } catch (Exception e) {
+                    log.error("Guarded asynchronous notification chain failed for member: {}", asyncMemberId, e);
+                }
+            });
         }
 
         return mapToResponse(savedMember);

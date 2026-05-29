@@ -12,6 +12,8 @@ import java.util.List;
 public interface MemberService {
 
     MemberResponse registerMember(MemberJoinRequest request);
+
+
     void renewSubscription(Long memberId, Long planId,
                            BigDecimal amountPaid,
                            String paymentMode,
