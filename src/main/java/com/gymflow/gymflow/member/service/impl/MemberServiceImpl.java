@@ -224,6 +224,26 @@ public class MemberServiceImpl implements MemberService {
         member.setStatus(subscription.getStatus());
 
         log.info("SaaS renewal processed. Access granted through state: {} until: {}", member.getStatus(), member.getExpiryDate());
+
+        // 🔥 NEW: Guarded Asynchronous Multi-Message Renewal Notification Engine
+        final Long asyncMemberId = member.getId();
+        final String asyncStatus = member.getStatus();
+
+        if ("ACTIVE".equals(asyncStatus)) {
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    // A lightweight micro-sleep window ensuring the database row has committed completely
+                    Thread.sleep(300);
+
+                    notificationTemplateRepository.findByName("MEMBER_RENEWAL_CONFIRMATION")
+                            .ifPresent(template -> notificationService.sendNotification(asyncMemberId, template.getId()));
+
+                    log.info("Asynchronous renewal confirmation message sent successfully for member: {}", asyncMemberId);
+                } catch (Exception e) {
+                    log.error("Guarded asynchronous renewal notification failed for member: {}", asyncMemberId, e);
+                }
+            });
+        }
     }
 
     @Override

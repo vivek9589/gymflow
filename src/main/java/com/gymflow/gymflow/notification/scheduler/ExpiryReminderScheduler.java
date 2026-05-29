@@ -30,26 +30,26 @@ public class ExpiryReminderScheduler {
 
     /**
      * Scheduled job to send expiry reminders to active members whose subscriptions
-     * expire in 3 days. Runs daily at 2 AM by default.
+     * expire in 1 day (tomorrow). Runs daily at 2 AM.
      */
     @Scheduled(cron = "${scheduler.expiry-reminder.cron}")
     public void sendExpiryReminders() {
-        log.info("Starting expiry reminder scheduler at {}", LocalDateTime.now());
+        log.info("Starting production expiry reminder scheduler execution at {}", LocalDateTime.now());
 
-        // We only want to notify members expiring in 3 days
-        LocalDate targetDate = LocalDate.now().plusDays(3);
+        // 🔥 FIXED: Adjusted target date boundary to look exactly 1 day ahead (Tomorrow)
+        LocalDate targetDate = LocalDate.now().plusDays(1);
 
-        // CRITICAL: Updated to use the method that ignores soft-deleted members
+        // Fetch active, non-deleted members expiring tomorrow
         List<Member> members = memberRepository.findByExpiryDateAndDeletedFalse(targetDate);
 
         if (members.isEmpty()) {
-            log.info("No members expiring on {}. Job finished.", targetDate);
+            log.info("No members found expiring tomorrow ({}). Scheduler lifecycle idle.", targetDate);
             return;
         }
 
         Optional<NotificationTemplate> templateOpt = templateRepository.findByName("EXPIRY_REMINDER");
         if (templateOpt.isEmpty()) {
-            log.warn("Expiry reminder template 'EXPIRY_REMINDER' not found. Skipping job.");
+            log.error("CRITICAL CONFIGURATION ERROR: Template 'EXPIRY_REMINDER' missing from database tables.");
             return;
         }
 
@@ -58,23 +58,23 @@ public class ExpiryReminderScheduler {
         int failureCount = 0;
 
         for (Member member : members) {
-            // Safety check: Don't send if WhatsApp is disabled for this specific member
+            // Respect member privacy / notification channel opt-out flags
             if (!member.isWhatsappEnabled()) {
-                log.info("Skipping notification for {} - WhatsApp disabled", member.getName());
+                log.info("Skipping notification delivery routing for member: {} [Channel Opt-Out]", member.getName());
                 continue;
             }
 
             try {
                 notificationService.sendNotification(member.getId(), template.getId());
-                log.info("Created expiry reminder event for {} ({})", member.getName(), member.getPhone());
+                log.info("Successfully fired expiry reminder event sequence for: {} ({})", member.getName(), member.getPhone());
                 successCount++;
             } catch (Exception e) {
-                log.error("Failed to create reminder for {} ({}): {}",
+                log.error("Failed downstream delivery routing for member: {} ({}). Cause: {}",
                         member.getName(), member.getPhone(), e.getMessage());
                 failureCount++;
             }
         }
 
-        log.info("Expiry reminder scheduler completed. Success: {}, Failures: {}", successCount, failureCount);
+        log.info("Expiry reminder scheduler run finalized. Dispatched successfully: {}, Total Failures: {}", successCount, failureCount);
     }
 }
