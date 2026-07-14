@@ -5,6 +5,7 @@ import com.gymflow.gymflow.member.dto.request.MemberJoinRequest;
 import com.gymflow.gymflow.member.dto.request.MemberUpdateRequest;
 import com.gymflow.gymflow.member.dto.request.RenewRequest;
 import com.gymflow.gymflow.member.dto.response.MemberResponse;
+import com.gymflow.gymflow.member.dto.response.PagedMemberResponseDto;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.service.MemberService;
 import jakarta.validation.Valid;
@@ -70,20 +71,33 @@ public class MemberController {
      * Accessible only to OWNER role.
      */
     @GetMapping("/gym/{gymId}")
-    @PreAuthorize("hasRole('OWNER')")
-    public ResponseEntity<ApiResponse<Page<Member>>> getGymMembers(
+    public ResponseEntity<ApiResponse<PagedMemberResponseDto>> getMembers(
+
             @PathVariable Long gymId,
+
             @RequestParam(defaultValue = "0") int page,
+
             @RequestParam(defaultValue = "10") int size,
+
             @RequestParam(required = false) String status,
+
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) String planName) {
 
-        log.info("Request to fetch paged members for gymId: {}", gymId);
+            @RequestParam(required = false) String planName
+    ) {
 
-        Page<Member> memberPage = memberService.getAllMembersByGym(gymId, page, size, status, search, planName);
-
-        return ResponseEntity.ok(ApiResponse.success(memberPage, "Members fetched successfully"));
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        memberService.getAllMembersByGym(
+                                gymId,
+                                page,
+                                size,
+                                status,
+                                search,
+                                planName
+                        )
+                )
+        );
     }
 
     /**

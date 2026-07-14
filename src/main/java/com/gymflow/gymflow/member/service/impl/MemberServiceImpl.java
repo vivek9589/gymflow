@@ -8,13 +8,11 @@ import com.gymflow.gymflow.gym.entity.Gym;
 import com.gymflow.gymflow.gym.repository.GymRepository;
 import com.gymflow.gymflow.member.dto.request.MemberJoinRequest;
 import com.gymflow.gymflow.member.dto.request.MemberUpdateRequest;
-import com.gymflow.gymflow.member.dto.response.MemberResponse;
-import com.gymflow.gymflow.member.dto.response.PaymentHistoryDTO;
-import com.gymflow.gymflow.member.dto.response.RenewalOptionDTO;
-import com.gymflow.gymflow.member.dto.response.SubscriptionHistoryDTO;
+import com.gymflow.gymflow.member.dto.response.*;
 import com.gymflow.gymflow.member.entity.Member;
 import com.gymflow.gymflow.member.repository.MemberRepository;
 import com.gymflow.gymflow.member.service.MemberService;
+import com.gymflow.gymflow.member.specification.MemberSpecification;
 import com.gymflow.gymflow.notification.entity.NotificationTemplate;
 import com.gymflow.gymflow.notification.repository.NotificationTemplateRepository;
 import com.gymflow.gymflow.notification.service.NotificationService;
@@ -247,17 +245,91 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    public Page<Member> getAllMembersByGym(Long gymId, int page, int size, String status, String search, String planName) {
-        log.info("Fetching paged members for gymId: {} [Page: {}, Size: {}]", gymId, page, size);
+    @Transactional(readOnly = true)
+    public PagedMemberResponseDto getAllMembersByGym(
+            Long gymId,
+            int page,
+            int size,
+            String status,
+            String search,
+            String planName
+    ) {
 
-        // Sort by most recent first
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        log.info("Fetching members for gym {}", gymId);
 
-        // Convert "ALL" to null so the query ignores the filter
-        String statusFilter = "ALL".equalsIgnoreCase(status) ? null : status;
-        String planFilter = "ALL".equalsIgnoreCase(planName) ? null : planName;
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
 
-        return memberRepository.findWithFilters(gymId, statusFilter, search, planFilter, pageable);
+        String statusFilter =
+                (status == null
+                        || status.isBlank()
+                        || status.equalsIgnoreCase("ALL"))
+                        ? null
+                        : status.toUpperCase();
+
+        String searchFilter =
+                (search == null || search.isBlank())
+                        ? null
+                        : search.trim();
+
+        String planFilter =
+                (planName == null
+                        || planName.isBlank()
+                        || planName.equalsIgnoreCase("ALL"))
+                        ? null
+                        : planName;
+
+        LocalDate today = LocalDate.now();
+
+        Page<Member> memberPage = memberRepository.findAll(
+
+                MemberSpecification.filterMembers(
+                        gymId,
+                        statusFilter,
+                        searchFilter,
+                        planFilter,
+                        today
+                ),
+
+                pageable
+
+        );
+
+        Page<MemberListResponseDto> dtoPage = memberPage.map(this::convertToMemberListDto);
+
+        long totalMembers =
+                memberRepository.countTotalMembers(gymId);
+
+        long activeMembers =
+                memberRepository.countActiveMembers(
+                        gymId,
+                        today
+                );
+
+        long expiredMembers =
+                memberRepository.countExpiredMembers(
+                        gymId,
+                        today
+                );
+
+        MemberStatsDto stats =
+                MemberStatsDto.builder()
+                        .totalMembers(totalMembers)
+                        .activeMembers(activeMembers)
+                        .expiredMembers(expiredMembers)
+                        .build();
+
+        return PagedMemberResponseDto.builder()
+                .members(dtoPage.getContent())
+                .page(dtoPage.getNumber())
+                .size(dtoPage.getSize())
+                .totalPages(dtoPage.getTotalPages())
+                .totalMembers(dtoPage.getTotalElements())
+                .stats(stats)
+                .build();
     }
 
 
@@ -412,6 +484,25 @@ public class MemberServiceImpl implements MemberService {
                 .initialPayment(member.getInitialPayment())
                 .planName(member.getCurrentPlan() != null ? member.getCurrentPlan().getName() : "No Active Plan")
                 .checkInToken(member.getCheckInToken())
+                .build();
+    }
+
+
+    private MemberListResponseDto convertToMemberListDto(Member member) {
+
+        return MemberListResponseDto.builder()
+                .id(member.getId())
+                .name(member.getName())
+                .phone(member.getPhone())
+                .email(member.getEmail())
+                .status(member.getStatus())
+                .currentPlan(
+                        member.getCurrentPlan() != null
+                                ? member.getCurrentPlan().getName()
+                                : null
+                )
+                .expiryDate(member.getExpiryDate())
+                .createdAt(member.getCreatedAt())
                 .build();
     }
 }
