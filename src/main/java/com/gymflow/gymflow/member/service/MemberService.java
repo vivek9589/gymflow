@@ -3,6 +3,7 @@ package com.gymflow.gymflow.member.service;
 import com.gymflow.gymflow.member.dto.request.MemberJoinRequest;
 import com.gymflow.gymflow.member.dto.request.MemberUpdateRequest;
 import com.gymflow.gymflow.member.dto.response.MemberResponse;
+import com.gymflow.gymflow.member.dto.response.PagedMemberResponseDto;
 import com.gymflow.gymflow.member.entity.Member;
 import org.springframework.data.domain.Page;
 
@@ -19,8 +20,14 @@ public interface MemberService {
                            String paymentMode,
                            String transactionRef);
 
-    Page<Member> getAllMembersByGym(Long gymId, int page, int size, String status, String search, String planName);
-
+    PagedMemberResponseDto getAllMembersByGym(
+            Long gymId,
+            int page,
+            int size,
+            String status,
+            String search,
+            String planName
+    );
     void deleteMember(Long memberId);
     MemberResponse updateMember(Long id, MemberUpdateRequest request);
 
